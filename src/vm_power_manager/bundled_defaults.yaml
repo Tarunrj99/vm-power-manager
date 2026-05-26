@@ -1,0 +1,113 @@
+# =============================================================================
+# VM Power Manager — Bundled Defaults (Layer 1)
+# Users never edit this file. Override in your deployment config.yaml.
+# =============================================================================
+
+app:
+  name: vm-power-manager
+  environment: production
+  debug_mode: false
+  dry_run: false
+
+slack:
+  bot_token_env: SLACK_BOT_TOKEN
+  signing_secret_env: SLACK_SIGNING_SECRET
+  default_channel: "#vm-alerts"
+  access_control: "mentioned_only"
+
+defaults:
+  idle_metric: "gpu_utilization"
+  idle_threshold_below: 5
+  idle_duration_minutes: 30
+  warning_minutes: 5
+  check_interval_minutes: 10
+  auto_stop_enabled: false
+
+  metric_sources:
+    gpu_utilization: "monitoring_api"
+    cpu_utilization: "monitoring_api"
+    memory_utilization: "monitoring_api"
+    process_count: "ssh"
+
+  process_monitoring:
+    strategy: "watch_list"
+    watch_processes:
+      - "python"
+      - "python3"
+      - "node"
+      - "uvicorn"
+      - "gunicorn"
+      - "jupyter"
+      - "java"
+      - "dotnet"
+      - "cargo"
+      - "go"
+      - "Rscript"
+      - "julia"
+      - "terraform"
+    watch_commands: []
+    exclude_processes:
+      - "nginx"
+      - "sshd"
+      - "systemd"
+      - "systemd-journald"
+      - "systemd-logind"
+      - "systemd-resolved"
+      - "systemd-timesyncd"
+      - "systemd-udevd"
+      - "cron"
+      - "xrdp"
+      - "xrdp-sesman"
+      - "redis-server"
+      - "postgres"
+      - "containerd"
+      - "containerd-shim"
+      - "fluent-bit"
+      - "otelopscol"
+      - "google_osconfig_agent"
+      - "google_guest_agent"
+      - "ops-agent"
+      - "dockerd"
+      - "dbus-daemon"
+      - "polkitd"
+      - "snapd"
+      - "agetty"
+      - "login"
+      - "bash"
+      - "sh"
+      - "sleep"
+      - "cat"
+      - "tail"
+      - "less"
+      - "grep"
+      - "awk"
+      - "sed"
+      - "unattended-upgrades"
+      - "packagekitd"
+      - "multipathd"
+      - "irqbalance"
+      - "accounts-daemon"
+      - "networkd-dispatcher"
+      - "ModemManager"
+      - "udisksd"
+      - "thermald"
+      - "rsyslogd"
+      - "atd"
+    check_active_sessions: true
+
+  disable_auto_upgrades: true
+  pre_stop_commands: []
+  post_start_commands: []
+
+  notifications:
+    on_warning: true
+    on_stop: true
+    on_start: true
+    on_manual_stop: true
+    on_extend: true
+    on_cancel: true
+    daily_summary: true
+    daily_summary_time: "09:00"
+
+state:
+  backend: "gcs_bucket"

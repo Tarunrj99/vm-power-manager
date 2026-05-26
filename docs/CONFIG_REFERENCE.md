@@ -1,0 +1,113 @@
+# Configuration Reference
+
+## Configuration Layering
+
+| Layer | Location | Purpose |
+|---|---|---|
+| 1. Library Defaults | `src/vm_power_manager/bundled_defaults.yaml` | Every option with safe defaults. Never edit. |
+| 2. Deployment Config | Your `config.yaml` | Only what changes per deployment. |
+| 3. Slack Runtime | In-memory / state store | Temporary: extend, pause, cancel. |
+
+## All Configuration Options
+
+### app
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | `vm-power-manager` | App name for logging |
+| `environment` | string | `production` | Environment tag |
+| `debug_mode` | bool | `false` | Verbose logging |
+| `dry_run` | bool | `false` | Alerts but doesn't stop VMs |
+
+### slack
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `bot_token_env` | string | `SLACK_BOT_TOKEN` | Env var for bot token |
+| `signing_secret_env` | string | `SLACK_SIGNING_SECRET` | Env var for signing secret |
+| `default_channel` | string | `#vm-alerts` | Default notification channel |
+| `access_control` | string | `mentioned_only` | Global access control mode |
+
+### defaults
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `idle_metric` | string | `gpu_utilization` | `gpu_utilization`, `cpu_utilization`, `memory_utilization`, `process_count`, `combined` |
+| `idle_threshold_below` | float | `5` | Idle if metric below this % |
+| `idle_duration_minutes` | int | `30` | How long idle before warning |
+| `warning_minutes` | int | `5` | Warning time before stop |
+| `check_interval_minutes` | int | `10` | Scheduler frequency |
+| `auto_stop_enabled` | bool | `false` | Enable auto-stop (off by default) |
+| `disable_auto_upgrades` | bool | `true` | Disable unattended-upgrades |
+| `pre_stop_commands` | list | `[]` | Commands before stop |
+| `post_start_commands` | list | `[]` | Commands after start |
+
+### defaults.metric_sources
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `gpu_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
+| `cpu_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
+| `memory_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
+| `process_count` | string | `ssh` | Always `ssh` |
+
+### defaults.process_monitoring
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `strategy` | string | `watch_list` | `watch_list`, `exclude_list`, `both` |
+| `watch_processes` | list | `[python, node, ...]` | Binaries indicating real work |
+| `watch_commands` | list | `[]` | Keywords in command line |
+| `exclude_processes` | list | `[nginx, sshd, ...]` | System services to ignore |
+| `check_active_sessions` | bool | `true` | SSH/RDP sessions = active |
+
+### defaults.notifications
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `on_warning` | bool | `true` | Notify before stop |
+| `on_stop` | bool | `true` | Notify on stop |
+| `on_start` | bool | `true` | Notify on start |
+| `on_manual_stop` | bool | `true` | Notify on manual stop |
+| `on_extend` | bool | `true` | Notify on extend |
+| `on_cancel` | bool | `true` | Notify on cancel |
+| `daily_summary` | bool | `true` | Daily summary |
+| `daily_summary_time` | string | `09:00` | Summary time (24h) |
+
+### state
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `backend` | string | `gcs_bucket` | Backend type |
+| `project` | string | - | GCP project (for gcs_bucket/firestore) |
+| `bucket` | string | - | Bucket name (gcs_bucket/s3_bucket) |
+| `prefix` | string | `state/` | Object prefix |
+| `collection` | string | - | Firestore collection |
+| `table` | string | - | DynamoDB table |
+| `region` | string | - | AWS region |
+| `url_env` | string | `REDIS_URL` | Redis URL env var |
+| `key_prefix` | string | `vpm:` | Redis key prefix |
+| `path` | string | `./state/` | File backend directory |
+
+### vms[] (per VM)
+
+| Key | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | YES | Display name |
+| `cloud` | string | YES | `gcp`, `aws`, `azure`, `ssh` |
+| `gcp_name` | string | GCP | Instance name |
+| `project` | string | GCP | GCP project |
+| `zone` | string | GCP | GCP zone |
+| `gpu_type` | string | No | GPU model name |
+| `instance_id` | string | AWS | EC2 instance ID |
+| `region` | string | AWS | AWS region |
+| `ssh_host` | string | SSH | Hostname/IP |
+| `ssh_user` | string | No | SSH username (default: root) |
+| `ssh_key_env` | string | No | Env var for SSH key path |
+| `ssh_port` | int | No | SSH port (default: 22) |
+| `channel` | string | No | Override Slack channel |
+| `notify_users` | list | No | Users to @mention |
+| `access_control` | string | No | Override access mode |
+| `allowed_users` | list | No | For `specific_users` mode |
+
+Plus all `defaults.*` keys can be overridden per VM.

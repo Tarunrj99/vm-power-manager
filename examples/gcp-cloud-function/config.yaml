@@ -1,0 +1,51 @@
+# =============================================================================
+# VM Power Manager — GCP Cloud Function Example Config (Layer 2)
+#
+# Copy this to your private deployment directory and fill in your values.
+# Only overrides what's different from bundled defaults.
+# =============================================================================
+
+app:
+  name: vm-power-manager
+  environment: production
+
+slack:
+  default_channel: "#vm-alerts"
+
+state:
+  backend: "gcs_bucket"
+  project: "YOUR-GCP-PROJECT-ID"
+  bucket: "YOUR-STATE-BUCKET-NAME"
+  prefix: "state/"
+
+vms:
+  - name: "gpu-vm-01"
+    cloud: "gcp"
+    gcp_name: "gpu-vm-01"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-a"
+    gpu_type: "nvidia-tesla-t4"
+    notify_users: ["@user1", "@user2"]
+
+  - name: "gpu-vm-02"
+    cloud: "gcp"
+    gcp_name: "gpu-vm-02"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-b"
+    gpu_type: "nvidia-tesla-a100"
+    notify_users: ["@user3"]
+    idle_metric: "combined"
+    idle_duration_minutes: 45
+    process_monitoring:
+      watch_processes: ["python", "uvicorn", "node"]
+      watch_commands: ["my_training_script"]
+    post_start_commands:
+      - "sudo systemctl start nginx"
+
+  # SSH-only VM (non-GCP)
+  # - name: "on-prem-gpu"
+  #   cloud: "ssh"
+  #   ssh_host: "10.0.1.50"
+  #   ssh_user: "admin"
+  #   ssh_key_env: "SSH_KEY_PATH"
+  #   notify_users: ["@admin"]

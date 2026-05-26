@@ -1,0 +1,64 @@
+# =============================================================================
+# VM Power Manager — Example Deployment Config (Layer 2)
+#
+# Copy this file to your private deployment directory and fill in your values.
+# Only override what's different from bundled defaults.
+# Full reference: docs/CONFIG_REFERENCE.md
+# =============================================================================
+
+app:
+  name: vm-power-manager
+  environment: production
+  # debug_mode: true     # Verbose logging
+  # dry_run: true        # Alerts only, no VM actions
+
+slack:
+  default_channel: "#vm-alerts"
+  # access_control: "mentioned_only"   # or "channel_members", "specific_users"
+
+state:
+  backend: "gcs_bucket"              # gcs_bucket | firestore | redis | file
+  project: "YOUR-GCP-PROJECT-ID"
+  bucket: "YOUR-STATE-BUCKET-NAME"
+  prefix: "state/"
+
+# Override defaults per-deployment (optional)
+# defaults:
+#   idle_threshold_below: 5
+#   idle_duration_minutes: 30
+#   warning_minutes: 5
+#   auto_stop_enabled: false
+
+vms:
+  - name: "gpu-vm-01"
+    cloud: "gcp"                     # gcp | aws | azure | ssh
+    gcp_name: "gpu-vm-01"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-a"
+    gpu_type: "nvidia-tesla-t4"
+    notify_users: ["@user1", "@user2"]
+
+  - name: "gpu-vm-02"
+    cloud: "gcp"
+    gcp_name: "gpu-vm-02"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-b"
+    gpu_type: "nvidia-tesla-a100"
+    notify_users: ["@user3"]
+    # Per-VM overrides:
+    idle_metric: "combined"
+    idle_duration_minutes: 45
+    process_monitoring:
+      watch_processes: ["python", "uvicorn", "node"]
+      watch_commands: ["training_script"]
+    post_start_commands:
+      - "sudo systemctl start nginx"
+
+  # SSH-only VM (non-GCP):
+  # - name: "on-prem-gpu"
+  #   cloud: "ssh"
+  #   ssh_host: "10.0.1.50"
+  #   ssh_user: "admin"
+  #   ssh_key_env: "SSH_PRIVATE_KEY_PATH"
+  #   gpu_type: "nvidia-rtx-4090"
+  #   notify_users: ["@admin"]

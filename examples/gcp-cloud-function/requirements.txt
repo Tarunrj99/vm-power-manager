@@ -1,0 +1,9 @@
+functions-framework==3.*
+pyyaml>=6.0
+pydantic>=2.0
+google-cloud-compute>=1.14
+google-cloud-monitoring>=2.19
+google-cloud-storage>=2.14
+slack-sdk>=3.26
+paramiko>=3.4
+requests>=2.31

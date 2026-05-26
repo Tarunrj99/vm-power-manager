@@ -1,0 +1,34 @@
+# =============================================================================
+# VM Power Manager — Local Dev Config
+# Uses "file" state backend for testing without cloud dependencies.
+# =============================================================================
+
+app:
+  name: vm-power-manager-local
+  environment: dev
+  debug_mode: true
+  dry_run: true  # Don't actually stop VMs during local testing
+
+slack:
+  default_channel: "#vm-alerts-test"
+
+state:
+  backend: "file"
+  path: "./state/"
+
+vms:
+  - name: "test-gpu-vm-01"
+    cloud: "gcp"
+    gcp_name: "test-gpu-vm-01"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-a"
+    gpu_type: "nvidia-tesla-t4"
+    notify_users: ["@your-username"]
+
+  - name: "test-gpu-vm-02"
+    cloud: "gcp"
+    gcp_name: "test-gpu-vm-02"
+    project: "YOUR-GCP-PROJECT-ID"
+    zone: "us-central1-b"
+    gpu_type: "nvidia-tesla-a100"
+    notify_users: ["@your-username"]
