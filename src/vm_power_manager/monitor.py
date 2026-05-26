@@ -25,6 +25,9 @@ def check_all_vms(config: Config, state_backend: StateBackend) -> list[dict]:
     """
     Main monitoring loop: check each VM for idle state.
 
+    Always collects metrics and stores state. Only takes stop action
+    if auto_stop_enabled is true for the VM.
+
     Returns a list of actions taken (for reporting/logging):
     [{"vm": name, "action": "warning"|"stop"|"reset"|"skip", "metrics": {...}}]
     """
@@ -33,10 +36,6 @@ def check_all_vms(config: Config, state_backend: StateBackend) -> list[dict]:
 
     for vm_cfg in config.vms:
         resolved = vm_cfg.get_effective_config(defaults)
-
-        if not resolved.auto_stop_enabled:
-            actions.append({"vm": resolved.name, "action": "skip", "reason": "auto_stop_disabled"})
-            continue
 
         try:
             result = _check_single_vm(resolved, config, state_backend)
@@ -85,18 +84,31 @@ def _check_single_vm(
     # Determine if idle
     is_idle = _evaluate_idle(metrics, vm_config)
 
+    # Always update state with metrics
+    state.last_checked = now
+    state.last_metrics = metrics.model_dump()
+
     if is_idle:
         # Increment idle counter
-        state.idle_minutes += vm_config.idle_duration_minutes // 3  # Approx per check interval
+        check_interval = vm_config.check_interval_minutes if hasattr(vm_config, 'check_interval_minutes') else 10
+        state.idle_minutes += check_interval
         if state.idle_since is None:
             state.idle_since = now
 
-        # Decision tree
+        # Only take auto-stop actions if enabled
+        if not vm_config.auto_stop_enabled:
+            state_backend.set(vm_config.name, state)
+            return {
+                "vm": vm_config.name,
+                "action": "idle_monitoring_only",
+                "metrics": metrics.model_dump(),
+                "idle_minutes": state.idle_minutes,
+            }
+
+        # Decision tree (auto-stop enabled)
         if state.warning_sent:
-            # Warning was sent previously — time to stop?
             warning_age = (now - state.warning_sent_at).total_seconds() / 60
             if warning_age >= vm_config.warning_minutes:
-                # STOP the VM
                 action = _stop_vm(vm_config, adapter, state)
                 state_backend.set(vm_config.name, state)
                 return {
@@ -107,8 +119,6 @@ def _check_single_vm(
                     **action,
                 }
             else:
-                state.last_checked = now
-                state.last_metrics = metrics.model_dump()
                 state_backend.set(vm_config.name, state)
                 return {
                     "vm": vm_config.name,
@@ -117,11 +127,8 @@ def _check_single_vm(
                     "minutes_remaining": vm_config.warning_minutes - warning_age,
                 }
         elif state.idle_minutes >= vm_config.idle_duration_minutes:
-            # Idle long enough — send warning
             state.warning_sent = True
             state.warning_sent_at = now
-            state.last_checked = now
-            state.last_metrics = metrics.model_dump()
             state_backend.set(vm_config.name, state)
             return {
                 "vm": vm_config.name,
@@ -130,9 +137,6 @@ def _check_single_vm(
                 "idle_minutes": state.idle_minutes,
             }
         else:
-            # Still accumulating idle time
-            state.last_checked = now
-            state.last_metrics = metrics.model_dump()
             state_backend.set(vm_config.name, state)
             return {
                 "vm": vm_config.name,
@@ -146,8 +150,6 @@ def _check_single_vm(
         state.idle_minutes = 0
         state.warning_sent = False
         state.warning_sent_at = None
-        state.last_checked = now
-        state.last_metrics = metrics.model_dump()
         state_backend.set(vm_config.name, state)
         return {
             "vm": vm_config.name,
