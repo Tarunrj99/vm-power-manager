@@ -95,6 +95,15 @@ defaults:
       - "atd"
     check_active_sessions: true
 
+  gpu_protection:
+    enabled: true
+    check_before_stop: true
+    fallback_zones: []
+    max_start_retries: 3
+    retry_delay_seconds: 30
+    auto_migrate: false
+    notify_on_zone_change: true
+
   disable_auto_upgrades: true
   pre_stop_commands: []
   post_start_commands: []

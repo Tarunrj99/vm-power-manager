@@ -52,6 +52,10 @@ def handle_interaction(
         return _handle_start(vm_name, user_name, resolved, state_backend)
     elif action_id == "vm_status":
         return _handle_single_status(vm_name, resolved, state_backend)
+    elif action_id == "vm_gpu_stop_confirm":
+        return _handle_gpu_stop_confirm(vm_name, user_name, resolved, state_backend)
+    elif action_id == "vm_gpu_stop_cancel":
+        return {"text": f":white_check_mark: Stop cancelled. `{vm_name}` will keep running."}
     else:
         return {"text": f"Unknown action: `{action_id}`"}
 
@@ -155,6 +159,40 @@ def _handle_start(
         ip=info.external_ip,
         hook_result=hook_result,
     )
+
+
+def _handle_gpu_stop_confirm(
+    vm_name: str,
+    user_name: str,
+    resolved: ResolvedVMConfig,
+    state_backend: StateBackend,
+) -> dict:
+    """User confirmed stop despite GPU availability warning."""
+    adapter = _get_adapter(resolved)
+
+    if not adapter.is_running():
+        return {"text": f"`{vm_name}` is already stopped."}
+
+    if resolved.pre_stop_commands:
+        try:
+            from vm_power_manager.adapters.ssh import SSHAdapter
+            from vm_power_manager.lifecycle import run_pre_stop_hooks
+
+            ssh = SSHAdapter(resolved)
+            run_pre_stop_hooks(resolved, ssh)
+        except Exception as e:
+            logger.warning(f"Pre-stop hooks failed for {vm_name}: {e}")
+
+    adapter.stop()
+
+    state = state_backend.get_or_create(vm_name)
+    state.idle_since = None
+    state.idle_minutes = 0
+    state.warning_sent = False
+    state.warning_sent_at = None
+    state_backend.set(vm_name, state)
+
+    return MessageBuilder.vm_stopped(resolved, reason="manual", stopped_by=f"@{user_name}")
 
 
 def _handle_single_status(

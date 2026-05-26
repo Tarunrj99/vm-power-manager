@@ -58,6 +58,18 @@ class ProcessMonitoringConfig(BaseModel):
     check_active_sessions: bool = True
 
 
+class GpuProtectionConfig(BaseModel):
+    """Prevents GPU unavailability after stop by checking capacity and retrying in fallback zones."""
+
+    enabled: bool = True
+    check_before_stop: bool = True
+    fallback_zones: list[str] = Field(default_factory=list)
+    max_start_retries: int = 3
+    retry_delay_seconds: int = 30
+    auto_migrate: bool = False
+    notify_on_zone_change: bool = True
+
+
 class MetricSources(BaseModel):
     gpu_utilization: MetricSource = MetricSource.MONITORING_API
     cpu_utilization: MetricSource = MetricSource.MONITORING_API
@@ -85,6 +97,7 @@ class VMDefaults(BaseModel):
     auto_stop_enabled: bool = True
     metric_sources: MetricSources = Field(default_factory=MetricSources)
     process_monitoring: ProcessMonitoringConfig = Field(default_factory=ProcessMonitoringConfig)
+    gpu_protection: GpuProtectionConfig = Field(default_factory=GpuProtectionConfig)
     disable_auto_upgrades: bool = True
     pre_stop_commands: list[str] = Field(default_factory=list)
     post_start_commands: list[str] = Field(default_factory=list)
@@ -127,6 +140,7 @@ class VMConfig(BaseModel):
     auto_stop_enabled: bool | None = None
     metric_sources: MetricSources | None = None
     process_monitoring: ProcessMonitoringConfig | None = None
+    gpu_protection: GpuProtectionConfig | None = None
     disable_auto_upgrades: bool | None = None
     pre_stop_commands: list[str] | None = None
     post_start_commands: list[str] | None = None
@@ -166,6 +180,7 @@ class VMConfig(BaseModel):
             ),
             metric_sources=self.metric_sources or defaults.metric_sources,
             process_monitoring=self.process_monitoring or defaults.process_monitoring,
+            gpu_protection=self.gpu_protection or defaults.gpu_protection,
             disable_auto_upgrades=(
                 self.disable_auto_upgrades
                 if self.disable_auto_upgrades is not None
@@ -214,6 +229,7 @@ class ResolvedVMConfig(BaseModel):
     auto_stop_enabled: bool
     metric_sources: MetricSources
     process_monitoring: ProcessMonitoringConfig
+    gpu_protection: GpuProtectionConfig
     disable_auto_upgrades: bool
     pre_stop_commands: list[str]
     post_start_commands: list[str]

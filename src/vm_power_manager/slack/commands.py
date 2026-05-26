@@ -98,7 +98,7 @@ def _handle_start(
     config: Config,
     state_backend: StateBackend,
 ) -> dict:
-    """Start a VM."""
+    """Start a VM with GPU protection (retry + fallback zones)."""
     if not args:
         return {"text": "Usage: `/vm start <vm-name>`"}
 
@@ -115,9 +115,29 @@ def _handle_start(
     if adapter.is_running():
         return {"text": f"`{vm_name}` is already running."}
 
-    success = adapter.start()
-    if not success:
-        return {"text": f"Failed to start `{vm_name}`. Check logs."}
+    # Use GPU-protected start if available
+    gpu_enabled = resolved.gpu_protection.enabled and resolved.gpu_type
+    if gpu_enabled and hasattr(adapter, "start_with_gpu_protection"):
+        start_result = adapter.start_with_gpu_protection()
+
+        if not start_result["success"]:
+            return MessageBuilder.gpu_start_result(resolved, start_result)
+
+        # If migrated, update the zone in state for future reference
+        if start_result.get("migrated"):
+            state = state_backend.get_or_create(vm_name)
+            state.last_metrics["_zone_migrated_to"] = start_result["zone"]
+            state.last_metrics["_zone_migrated_from"] = start_result["original_zone"]
+            state.session_started = datetime.now(timezone.utc)
+            state.idle_since = None
+            state.idle_minutes = 0
+            state.warning_sent = False
+            state_backend.set(vm_name, state)
+            return MessageBuilder.gpu_start_result(resolved, start_result)
+    else:
+        success = adapter.start()
+        if not success:
+            return {"text": f"Failed to start `{vm_name}`. Check logs."}
 
     # Wait for VM and run post-start hooks
     adapter.wait_until_running(timeout_seconds=90)
@@ -159,11 +179,13 @@ def _handle_stop(
     config: Config,
     state_backend: StateBackend,
 ) -> dict:
-    """Stop a VM."""
+    """Stop a VM with GPU availability warning if applicable."""
     if not args:
         return {"text": "Usage: `/vm stop <vm-name>`"}
 
     vm_name = args[0]
+    force = "--force" in args
+
     resolved = _find_vm(vm_name, config)
     if resolved is None:
         return {"text": f"VM not found: `{vm_name}`."}
@@ -176,7 +198,20 @@ def _handle_stop(
     if not adapter.is_running():
         return {"text": f"`{vm_name}` is already stopped."}
 
-    # Pre-stop hooks
+    # GPU protection: warn before stop if GPU type is configured
+    gpu_config = resolved.gpu_protection
+    if (
+        gpu_config.enabled
+        and gpu_config.check_before_stop
+        and resolved.gpu_type
+        and not force
+        and hasattr(adapter, "check_gpu_availability")
+    ):
+        gpu_check = adapter.check_gpu_availability()
+        if not gpu_check.get("has_reservation"):
+            return MessageBuilder.gpu_stop_warning(resolved, gpu_check)
+
+    # Proceed with stop
     if resolved.pre_stop_commands:
         try:
             from vm_power_manager.adapters.ssh import SSHAdapter

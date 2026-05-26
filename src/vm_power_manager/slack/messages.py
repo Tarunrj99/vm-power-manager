@@ -314,6 +314,140 @@ class MessageBuilder:
         }
 
 
+    @staticmethod
+    def gpu_stop_warning(vm_config, gpu_check: dict) -> dict:
+        """Warning before stopping: GPU may not be available on restart."""
+        gpu_type = gpu_check.get("gpu_type", "unknown")
+        zone = gpu_check.get("zone", "unknown")
+        has_reservation = gpu_check.get("has_reservation", False)
+
+        if has_reservation:
+            risk_text = ":white_check_mark: *Low risk* — GPU reservation detected in this zone."
+        else:
+            risk_text = (
+                ":warning: *High risk* — No GPU reservation found.\n"
+                f"GPU type `{gpu_type}` may not be available in `{zone}` when you try to restart.\n"
+                "You may need to migrate the VM to a different zone."
+            )
+
+        return {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": "GPU Availability Warning"},
+                },
+                {"type": "divider"},
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*VM:* `{vm_config.name}`\n"
+                            f"*GPU:* `{gpu_type}`\n"
+                            f"*Zone:* `{zone}`\n\n"
+                            f"{risk_text}\n\n"
+                            "_Stopping this VM releases the GPU back to the shared pool. "
+                            "If the zone runs out of GPU capacity, you won't be able to restart "
+                            "without migrating to another zone._"
+                        ),
+                    },
+                },
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Stop Anyway"},
+                            "style": "danger",
+                            "action_id": "vm_gpu_stop_confirm",
+                            "value": vm_config.name,
+                        },
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Keep Running"},
+                            "style": "primary",
+                            "action_id": "vm_gpu_stop_cancel",
+                            "value": vm_config.name,
+                        },
+                    ],
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": (
+                                ":bulb: *Tip:* Create a GPU reservation to guarantee capacity: "
+                                "`gcloud compute reservations create ...` "
+                                "— see docs/GPU_AVAILABILITY.md"
+                            ),
+                        },
+                    ],
+                },
+            ]
+        }
+
+    @staticmethod
+    def gpu_start_result(vm_config, start_result: dict) -> dict:
+        """Result of a start attempt with GPU protection (may include zone migration info)."""
+        success = start_result.get("success", False)
+        migrated = start_result.get("migrated", False)
+        zone = start_result.get("zone", "unknown")
+        original_zone = start_result.get("original_zone", zone)
+        attempts = start_result.get("attempts", 0)
+        error = start_result.get("error")
+
+        if success and not migrated:
+            return {
+                "text": f":large_green_circle: `{vm_config.name}` started in `{zone}` (attempt {attempts})."
+            }
+
+        if success and migrated:
+            return {
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": (
+                                f":large_green_circle: *VM Started (Zone Changed)*\n\n"
+                                f"*VM:* `{vm_config.name}`\n"
+                                f"*Original zone:* `{original_zone}` (GPU unavailable)\n"
+                                f"*New zone:* `{zone}`\n"
+                                f"*Attempts:* {attempts}\n\n"
+                                f":warning: The VM was migrated to `{zone}` because GPU capacity "
+                                f"was exhausted in `{original_zone}`."
+                            ),
+                        },
+                    },
+                ]
+            }
+
+        # Failed
+        return {
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f":x: *Failed to Start VM*\n\n"
+                            f"*VM:* `{vm_config.name}`\n"
+                            f"*Zone:* `{original_zone}`\n"
+                            f"*Attempts:* {attempts}\n"
+                            f"*Error:* {error or 'GPU unavailable in all configured zones'}\n\n"
+                            "*Solutions:*\n"
+                            "1. Try again later (GPU capacity fluctuates)\n"
+                            "2. Add `fallback_zones` + `auto_migrate: true` in config\n"
+                            "3. Create a GPU reservation: `gcloud compute reservations create ...`\n"
+                            "4. Manually migrate: `/vm migrate <name> <zone>`"
+                        ),
+                    },
+                },
+            ]
+        }
+
+
 def _fmt_pct(value) -> str:
     """Format a percentage value for display."""
     if value is None:

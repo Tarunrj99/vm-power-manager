@@ -28,6 +28,14 @@ state:
 #   idle_duration_minutes: 30
 #   warning_minutes: 5
 #   auto_stop_enabled: false
+#   gpu_protection:
+#     enabled: true
+#     check_before_stop: true       # Warn in Slack before stopping GPU VMs
+#     fallback_zones: []            # Global fallback zones (override per-VM)
+#     max_start_retries: 3          # Retry in same zone before fallback
+#     retry_delay_seconds: 30       # Delay between retries
+#     auto_migrate: false           # Auto-migrate VM to fallback zone
+#     notify_on_zone_change: true   # Slack alert if VM changes zone
 
 vms:
   - name: "gpu-vm-01"
@@ -53,6 +61,10 @@ vms:
       watch_commands: ["training_script"]
     post_start_commands:
       - "sudo systemctl start nginx"
+    # GPU protection — per-VM fallback zones:
+    gpu_protection:
+      fallback_zones: ["us-central1-a", "us-central1-c", "us-central1-f"]
+      auto_migrate: true
 
   # SSH-only VM (non-GCP):
   # - name: "on-prem-gpu"

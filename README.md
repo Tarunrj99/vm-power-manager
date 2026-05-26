@@ -158,9 +158,13 @@ vm-power-manager/
 │   ├── gcp-cloud-function/          ← GCP Cloud Function (prod)
 │   └── local-dev/                   ← FastAPI dev server
 │
+├── scripts/                         ← helper scripts
+│   └── gpu-reservation-setup.sh    ← create GCP GPU reservations
+│
 ├── docs/                            ← deeper docs
 │   ├── CONFIG_REFERENCE.md
-│   └── SETUP_GUIDE.md
+│   ├── SETUP_GUIDE.md
+│   └── GPU_AVAILABILITY.md         ← GPU unavailability guide
 │
 └── tests/
 ```
@@ -247,6 +251,7 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 | Per-VM access control | Only authorized users can control each VM | stable |
 | Lifecycle hooks | Pre-stop/post-start commands, auto-upgrade prevention | stable |
 | Extend/Pause | `/vm extend <name> 30`, `/vm pause <name>` | stable |
+| **GPU availability protection** | Pre-stop warning, multi-zone retry, auto-migrate on start | stable |
 | Daily summary | Overview of all VMs posted at configured time | stable |
 | Multiple state backends | GCS, Firestore, S3, DynamoDB, Redis, File | stable |
 
@@ -334,6 +339,7 @@ vms:
 |-----|-------|
 | [CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md) | Every config key, with examples |
 | [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | End-to-end: GCP + Slack setup |
+| [GPU_AVAILABILITY.md](docs/GPU_AVAILABILITY.md) | GPU unavailability after stop: problem, prevention, fallback |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, PR checklist |
 | [SECURITY.md](SECURITY.md) | Disclosure policy |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
