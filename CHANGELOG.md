@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] — 2026-05-27
+
+### Added
+
+- **Disk metrics**: New `disk_utilization` field in `MetricSnapshot` — collected via SSH (`df`) or Monitoring API
+- **GPU continuous-running alerts**: Configurable per-VM alerts when GPU VMs run beyond a threshold (e.g., every 30min/60min). Informational only — no auto-stop
+- **Daily digest**: Comprehensive daily VM summary sent to Slack — shows uptime, GPU/CPU/memory/disk, active processes. GPU VMs highlighted separately
+- **Metric fallback**: If Monitoring API returns `None` for a metric, SSH is attempted as fallback
+- **Command attribution**: `/vm status|start|stop` now posts a visible message showing who ran the command (everyone in channel sees it)
+- **GPU-first status display**: `/vm status` splits VMs into GPU VMs (full detail) and Standard VMs (compact)
+- `GpuMonitoringConfig` model with `alert_interval_minutes`, `alert_after_minutes` per-VM overrides
+- `send_daily_digest()` public API entry point
+- Cloud Function `daily_digest` entry point + Cloud Scheduler job setup
+- `last_gpu_alert_sent` field in `VMState` for alert tracking
+
+### Changed
+
+- Status template redesigned: GPU VMs show GPU type, utilization, disk, uptime; non-GPU VMs show compact CPU/MEM only
+- `_collect_metrics()` now uses lazy SSH connection and fallback logic
+- Bumped to v1.2.0
+
 ## [1.1.0] — 2026-05-27
 
 ### Added

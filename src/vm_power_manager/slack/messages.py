@@ -235,7 +235,10 @@ class MessageBuilder:
 
     @staticmethod
     def status_response(vm_statuses: list[dict]) -> dict:
-        """Status overview of all VMs (response to /vm status)."""
+        """Status overview of all VMs — GPU VMs shown with full detail, others compact."""
+        gpu_vms = [v for v in vm_statuses if v.get("gpu_type")]
+        other_vms = [v for v in vm_statuses if not v.get("gpu_type")]
+
         blocks = [
             {
                 "type": "header",
@@ -244,32 +247,23 @@ class MessageBuilder:
             {"type": "divider"},
         ]
 
-        for vm in vm_statuses:
-            status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
-            status_text = "Running" if vm.get("running") else "Stopped"
-
-            gpu = _fmt_pct(vm.get("gpu"))
-            cpu = _fmt_pct(vm.get("cpu"))
-            mem = _fmt_pct(vm.get("memory"))
-            procs = vm.get("processes", 0)
-            ip = vm.get("ip") or "—"
-            error = vm.get("error")
-
-            if error:
-                detail = f"_Error: {error[:80]}_"
-            else:
-                detail = (
-                    f"  GPU: `{gpu}`  |  CPU: `{cpu}`  |  MEM: `{mem}`  |  Procs: `{procs}`\n"
-                    f"  IP: `{ip}`"
-                )
-
+        if gpu_vms:
             blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"{status_emoji}  *{vm['name']}*  — _{status_text}_\n{detail}",
-                },
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": ":zap: *GPU VMs*"}],
             })
+            for vm in gpu_vms:
+                blocks.append(_build_gpu_vm_status_block(vm))
+
+        if other_vms:
+            if gpu_vms:
+                blocks.append({"type": "divider"})
+            blocks.append({
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": ":desktop_computer: *Standard VMs*"}],
+            })
+            for vm in other_vms:
+                blocks.append(_build_standard_vm_status_block(vm))
 
         if not vm_statuses:
             blocks.append({
@@ -287,28 +281,106 @@ class MessageBuilder:
 
     @staticmethod
     def daily_summary(vm_summaries: list[dict]) -> dict:
-        """Daily summary of all VMs."""
-        rows = []
-        for vm in vm_summaries:
-            status = ":large_green_circle: Running" if vm.get("running") else ":red_circle: Stopped"
-            idle_flag = " :zzz:" if vm.get("idle") else ""
-            row = (
-                f"• *{vm['name']}* — {status}{idle_flag}\n"
-                f"  Uptime: {vm.get('uptime', 'N/A')} | "
-                f"GPU avg: {vm.get('gpu_avg', 'N/A')}%"
-            )
-            rows.append(row)
+        """Comprehensive daily summary — GPU VMs first with full metrics, then standard VMs."""
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": "Daily VM Summary"},
+            },
+            {"type": "divider"},
+        ]
+
+        gpu_vms = [v for v in vm_summaries if v.get("gpu_type")]
+        other_vms = [v for v in vm_summaries if not v.get("gpu_type")]
+
+        if gpu_vms:
+            blocks.append({
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": ":zap: *GPU VMs*"}],
+            })
+            for vm in gpu_vms:
+                status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
+                status_text = "Running" if vm.get("running") else "Stopped"
+                uptime = vm.get("uptime", "—")
+                gpu = _fmt_pct(vm.get("gpu"))
+                cpu = _fmt_pct(vm.get("cpu"))
+                mem = _fmt_pct(vm.get("memory"))
+                disk = _fmt_pct(vm.get("disk"))
+                procs = vm.get("processes", 0)
+                gpu_type = vm.get("gpu_type", "—")
+
+                text = (
+                    f"{status_emoji} *{vm['name']}* — _{status_text}_\n"
+                    f"  GPU Type: `{gpu_type}` | Uptime: `{uptime}`\n"
+                    f"  GPU: `{gpu}` | CPU: `{cpu}` | MEM: `{mem}` | Disk: `{disk}`\n"
+                    f"  Processes: `{procs}`"
+                )
+                blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
+
+        if other_vms:
+            if gpu_vms:
+                blocks.append({"type": "divider"})
+            blocks.append({
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": ":desktop_computer: *Standard VMs*"}],
+            })
+            for vm in other_vms:
+                status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
+                status_text = "Running" if vm.get("running") else "Stopped"
+                uptime = vm.get("uptime", "—")
+                cpu = _fmt_pct(vm.get("cpu"))
+                mem = _fmt_pct(vm.get("memory"))
+                text = f"{status_emoji} *{vm['name']}* — _{status_text}_ | Uptime: `{uptime}` | CPU: `{cpu}` | MEM: `{mem}`"
+                blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
+
+        if not vm_summaries:
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": "_No VMs configured._"}})
+
+        blocks.append({"type": "divider"})
+        blocks.append({
+            "type": "context",
+            "elements": [{"type": "mrkdwn", "text": f":calendar: <!date^{int(datetime.now(timezone.utc).timestamp())}^{{date_long_pretty}}|today>"}],
+        })
+
+        return {"blocks": blocks}
+
+    @staticmethod
+    def gpu_running_alert(vm_config, metrics: dict, uptime: str) -> dict:
+        """Informational alert: GPU VM has been running continuously."""
+        gpu = _fmt_pct(metrics.get("gpu_utilization"))
+        cpu = _fmt_pct(metrics.get("cpu_utilization"))
+        mem = _fmt_pct(metrics.get("memory_utilization"))
+        disk = _fmt_pct(metrics.get("disk_utilization"))
+        procs = metrics.get("active_process_count", 0)
+        gpu_type = vm_config.gpu_type or "—"
+
+        process_list = ""
+        active = metrics.get("active_processes", [])
+        if active:
+            proc_names = ", ".join(p.get("cmd", "?").split("/")[-1][:20] for p in active[:5])
+            process_list = f" ({proc_names})"
 
         return {
             "blocks": [
                 {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": "📊 Daily VM Summary"},
-                },
-                {"type": "divider"},
-                {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": "\n\n".join(rows) or "_No VMs._"},
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f":rotating_light: *GPU VM Running:* `{vm_config.name}`\n"
+                            f"Running for: *{uptime}*\n"
+                            f"GPU: `{gpu_type}` | Utilization: `{gpu}`\n"
+                            f"CPU: `{cpu}` | Memory: `{mem}` | Disk: `{disk}`\n"
+                            f"Processes: `{procs}` active{process_list}"
+                        ),
+                    },
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {"type": "mrkdwn", "text": f"cc: {' '.join(vm_config.notify_users)}"},
+                        {"type": "mrkdwn", "text": "_Use `/vm stop " + vm_config.name + "` to shut down._"},
+                    ],
                 },
             ]
         }
@@ -446,6 +518,56 @@ class MessageBuilder:
                 },
             ]
         }
+
+
+def _build_gpu_vm_status_block(vm: dict) -> dict:
+    """Build a rich status block for a GPU-enabled VM."""
+    status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
+    status_text = "Running" if vm.get("running") else "Stopped"
+    error = vm.get("error")
+
+    if error:
+        detail = f"_Error: {error[:80]}_"
+    else:
+        gpu = _fmt_pct(vm.get("gpu"))
+        cpu = _fmt_pct(vm.get("cpu"))
+        mem = _fmt_pct(vm.get("memory"))
+        disk = _fmt_pct(vm.get("disk"))
+        procs = vm.get("processes", 0)
+        ip = vm.get("ip") or "—"
+        gpu_type = vm.get("gpu_type", "—")
+        uptime = vm.get("uptime", "—")
+
+        detail = (
+            f"  GPU: `{gpu_type}` | Utilization: `{gpu}`\n"
+            f"  CPU: `{cpu}` | MEM: `{mem}` | Disk: `{disk}` | Procs: `{procs}`\n"
+            f"  Uptime: `{uptime}` | IP: `{ip}`"
+        )
+
+    return {
+        "type": "section",
+        "text": {"type": "mrkdwn", "text": f"{status_emoji}  *{vm['name']}*  — _{status_text}_\n{detail}"},
+    }
+
+
+def _build_standard_vm_status_block(vm: dict) -> dict:
+    """Build a compact status block for a non-GPU VM."""
+    status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
+    status_text = "Running" if vm.get("running") else "Stopped"
+    error = vm.get("error")
+
+    if error:
+        detail = f"_Error: {error[:80]}_"
+    else:
+        cpu = _fmt_pct(vm.get("cpu"))
+        mem = _fmt_pct(vm.get("memory"))
+        ip = vm.get("ip") or "—"
+        detail = f"  CPU: `{cpu}` | MEM: `{mem}` | IP: `{ip}`"
+
+    return {
+        "type": "section",
+        "text": {"type": "mrkdwn", "text": f"{status_emoji}  *{vm['name']}*  — _{status_text}_\n{detail}"},
+    }
 
 
 def _fmt_pct(value) -> str:

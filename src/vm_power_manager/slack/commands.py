@@ -67,17 +67,31 @@ def _handle_status(config: Config, state_backend: StateBackend) -> dict:
             info = adapter.get_status()
             state = state_backend.get(resolved.name)
             metrics = state.last_metrics if state else {}
+
+            uptime = "—"
+            if state and state.session_started and info.status == "RUNNING":
+                delta = datetime.now(timezone.utc) - state.session_started
+                hours = int(delta.total_seconds() / 3600)
+                minutes = int((delta.total_seconds() % 3600) / 60)
+                if hours > 0:
+                    uptime = f"{hours}h {minutes}m"
+                else:
+                    uptime = f"{minutes}m"
+
             return {
                 "name": resolved.name,
                 "running": info.status == "RUNNING",
                 "gpu": metrics.get("gpu_utilization"),
                 "cpu": metrics.get("cpu_utilization"),
                 "memory": metrics.get("memory_utilization"),
+                "disk": metrics.get("disk_utilization"),
                 "processes": metrics.get("active_process_count", 0),
                 "ip": info.external_ip,
+                "gpu_type": resolved.gpu_type,
+                "uptime": uptime,
             }
         except Exception as e:
-            return {"name": resolved.name, "running": False, "error": str(e)[:100]}
+            return {"name": resolved.name, "running": False, "error": str(e)[:100], "gpu_type": vm_cfg.gpu_type}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(_check_vm, vm): vm for vm in config.vms}
@@ -86,7 +100,7 @@ def _handle_status(config: Config, state_backend: StateBackend) -> dict:
                 statuses.append(future.result())
             except Exception as e:
                 vm = futures[future]
-                statuses.append({"name": vm.name, "running": False, "error": str(e)[:100]})
+                statuses.append({"name": vm.name, "running": False, "error": str(e)[:100], "gpu_type": vm.gpu_type})
 
     return MessageBuilder.status_response(statuses)
 

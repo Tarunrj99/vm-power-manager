@@ -101,3 +101,10 @@ class MonitoringAPICollector:
             "agent.googleapis.com/memory/percent_used"
         )
         return value
+
+    def get_disk_utilization(self) -> float | None:
+        """Disk utilization from Ops Agent (root partition)."""
+        value = self._query_metric(
+            "agent.googleapis.com/disk/percent_used"
+        )
+        return value

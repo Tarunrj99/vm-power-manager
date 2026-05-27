@@ -43,6 +43,7 @@ defaults:
     gpu_utilization: "monitoring_api"
     cpu_utilization: "monitoring_api"
     memory_utilization: "monitoring_api"
+    disk_utilization: "ssh"
     process_count: "ssh"
 
   process_monitoring:
@@ -119,6 +120,12 @@ defaults:
     retry_delay_seconds: 30
     auto_migrate: false
     notify_on_zone_change: true
+
+  gpu_monitoring:
+    enabled: true
+    alert_interval_minutes: 60
+    alert_after_minutes: 60
+    include_in_regular_check: true
 
   disable_auto_upgrades: true
   pre_stop_commands: []

@@ -34,6 +34,14 @@ state:
 #   idle_duration_minutes: 30
 #   warning_minutes: 5
 #   auto_stop_enabled: false
+#
+#   metric_sources:
+#     gpu_utilization: "monitoring_api"   # or "ssh"
+#     cpu_utilization: "monitoring_api"
+#     memory_utilization: "monitoring_api"
+#     disk_utilization: "ssh"             # or "monitoring_api"
+#     process_count: "ssh"
+#
 #   gpu_protection:
 #     enabled: true
 #     check_before_stop: true       # Warn in Slack before stopping GPU VMs
@@ -42,6 +50,12 @@ state:
 #     retry_delay_seconds: 30       # Delay between retries
 #     auto_migrate: false           # Auto-migrate VM to fallback zone
 #     notify_on_zone_change: true   # Slack alert if VM changes zone
+#
+#   gpu_monitoring:
+#     enabled: true                 # Alert when GPU VMs run continuously
+#     alert_interval_minutes: 60    # Alert every N minutes (per GPU VM)
+#     alert_after_minutes: 60       # Only alert after VM has run this long
+#     include_in_regular_check: true
 
 vms:
   - name: "gpu-vm-01"
@@ -71,6 +85,9 @@ vms:
     gpu_protection:
       fallback_zones: ["us-central1-a", "us-central1-c", "us-central1-f"]
       auto_migrate: true
+    # GPU monitoring — alert more frequently for expensive A100 VMs:
+    gpu_monitoring:
+      alert_interval_minutes: 30
 
   # SSH-only VM (non-GCP):
   # - name: "on-prem-gpu"

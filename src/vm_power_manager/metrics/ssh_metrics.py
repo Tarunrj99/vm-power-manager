@@ -58,6 +58,19 @@ class SSHMetricCollector:
             logger.warning(f"SSH memory metric failed for {self._config.name}: {e}")
             return None
 
+    def get_disk_utilization(self) -> float | None:
+        """Root partition disk utilization via df."""
+        try:
+            stdout, _, exit_code = self._ssh.run_command(
+                "df / --output=pcent | tail -1 | tr -d ' %'"
+            )
+            if exit_code != 0:
+                return None
+            return float(stdout.strip()) if stdout.strip() else None
+        except Exception as e:
+            logger.warning(f"SSH disk metric failed for {self._config.name}: {e}")
+            return None
+
     def get_processes(self) -> str:
         """Get full process list for process detection."""
         try:

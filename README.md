@@ -244,7 +244,7 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 
 | Feature | What it does | Status |
 |---------|-------------|--------|
-| Idle detection | Monitors GPU/CPU/memory/processes, triggers warnings | stable |
+| Idle detection | Monitors GPU/CPU/memory/disk/processes, triggers warnings | stable |
 | Smart process detection | Distinguishes app processes from system services | stable |
 | Slack warnings | 5-min countdown with Keep Running / Stop Now buttons | stable |
 | Manual start/stop | `/vm start <name>`, `/vm stop <name>` from Slack | stable |
@@ -252,7 +252,11 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 | Lifecycle hooks | Pre-stop/post-start commands, auto-upgrade prevention | stable |
 | Extend/Pause | `/vm extend <name> 30`, `/vm pause <name>` | stable |
 | **GPU availability protection** | Pre-stop warning, multi-zone retry, auto-migrate on start | stable |
-| Daily summary | Overview of all VMs posted at configured time | stable |
+| **GPU continuous-running alerts** | Configurable interval alerts for GPU VMs running too long | stable |
+| **Daily digest** | Comprehensive VM summary (uptime, GPU/CPU/mem/disk, processes) | stable |
+| **Command attribution** | Everyone sees who ran `/vm status/start/stop` in channel | stable |
+| Metric fallback | Falls back to SSH if Monitoring API returns no data | stable |
+| Disk metrics | Root partition usage via SSH (`df`) or Monitoring API | stable |
 | Multiple state backends | GCS, Firestore, S3, DynamoDB, Redis, File | stable |
 
 ---

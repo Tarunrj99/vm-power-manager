@@ -8,6 +8,7 @@ import json
 import logging
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -196,6 +197,9 @@ def _handle_async_command(
 ):
     """Process a slow command in background and POST result to response_url."""
     try:
+        # Post a visible header to the channel showing who ran the command
+        _post_command_attribution(channel_id, user_name, command_text, config)
+
         state_backend = create_state_backend(config)
         result = handle_command(
             command_text=command_text,
@@ -225,6 +229,32 @@ def _handle_async_command(
             )
         except Exception:
             pass
+
+
+def _post_command_attribution(channel_id: str, user_name: str, command_text: str, config: Config):
+    """Post a visible message to the channel showing who ran a /vm command."""
+    try:
+        from slack_sdk import WebClient
+
+        token = get_slack_token(config)
+        client = WebClient(token=token)
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"@{user_name} ran `/vm {command_text}`",
+            blocks=[
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f":computer: *@{user_name}* ran `/vm {command_text}`",
+                        }
+                    ],
+                }
+            ],
+        )
+    except Exception as e:
+        logger.warning(f"Failed to post command attribution: {e}")
 
 
 def _verify_slack_signature(request, config: Config) -> bool:
@@ -257,6 +287,81 @@ def _verify_slack_signature(request, config: Config) -> bool:
         return False
 
     return True
+
+
+def send_daily_digest(config: str | Path | Config) -> dict:
+    """
+    Daily digest entry point. Called by Cloud Scheduler once per day.
+
+    Collects live metrics for all VMs and posts a comprehensive summary to Slack.
+    """
+    if isinstance(config, (str, Path)):
+        config = load_config(config)
+
+    manifest_result = _check_manifest_gate(config)
+    if manifest_result is not None:
+        return manifest_result
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from slack_sdk import WebClient
+
+    state_backend = create_state_backend(config)
+    defaults = config.defaults
+    now = datetime.now(timezone.utc)
+
+    def _collect_vm_summary(vm_cfg):
+        resolved = vm_cfg.get_effective_config(defaults)
+        try:
+            from vm_power_manager.monitor import _get_vm_adapter
+            adapter = _get_vm_adapter(resolved)
+            info = adapter.get_status()
+            is_running = info.status == "RUNNING"
+
+            state = state_backend.get(resolved.name)
+            metrics = state.last_metrics if state else {}
+
+            uptime = "—"
+            if state and state.session_started and is_running:
+                delta = now - state.session_started
+                hours = int(delta.total_seconds() / 3600)
+                minutes = int((delta.total_seconds() % 3600) / 60)
+                uptime = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+
+            return {
+                "name": resolved.name,
+                "running": is_running,
+                "gpu": metrics.get("gpu_utilization"),
+                "cpu": metrics.get("cpu_utilization"),
+                "memory": metrics.get("memory_utilization"),
+                "disk": metrics.get("disk_utilization"),
+                "processes": metrics.get("active_process_count", 0),
+                "gpu_type": resolved.gpu_type,
+                "uptime": uptime,
+            }
+        except Exception as e:
+            return {"name": resolved.name, "running": False, "error": str(e)[:100], "gpu_type": vm_cfg.gpu_type}
+
+    summaries = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_collect_vm_summary, vm): vm for vm in config.vms}
+        for future in as_completed(futures, timeout=30):
+            try:
+                summaries.append(future.result())
+            except Exception as e:
+                vm = futures[future]
+                summaries.append({"name": vm.name, "running": False, "gpu_type": vm.gpu_type})
+
+    msg = MessageBuilder.daily_summary(summaries)
+
+    try:
+        token = get_slack_token(config)
+        client = WebClient(token=token)
+        channel = config.slack.default_channel
+        _post_message(client, channel, msg)
+    except Exception as e:
+        logger.error(f"Failed to send daily digest: {e}")
+
+    return {"status": "sent", "vms_reported": len(summaries)}
 
 
 def _send_notifications(actions: list[dict], config: Config, state_backend: StateBackend):
@@ -292,6 +397,12 @@ def _send_notifications(actions: list[dict], config: Config, state_backend: Stat
 
         elif action_type == "stop" and resolved.notifications.on_stop:
             msg = MessageBuilder.vm_stopped(resolved, reason="auto")
+            _post_message(client, channel, msg)
+
+        elif action_type == "gpu_running_alert":
+            uptime = action_result.get("uptime", "—")
+            metrics_data = action_result.get("metrics", {})
+            msg = MessageBuilder.gpu_running_alert(resolved, metrics_data, uptime)
             _post_message(client, channel, msg)
 
 

@@ -70,13 +70,29 @@ Prevents GPU unavailability after VM stop. See [GPU_AVAILABILITY.md](GPU_AVAILAB
 | `auto_migrate` | bool | `false` | Auto-migrate VM to fallback zone on failure |
 | `notify_on_zone_change` | bool | `true` | Slack alert when VM migrates to new zone |
 
+### defaults.gpu_monitoring
+
+Alerts when GPU VMs run continuously beyond a configurable threshold. Informational only — does not auto-stop.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Enable GPU running alerts |
+| `alert_interval_minutes` | int | `60` | Alert every N minutes per running GPU VM |
+| `alert_after_minutes` | int | `60` | Only start alerting after VM runs this long |
+| `include_in_regular_check` | bool | `true` | Check during normal monitor cycle (every 10 min) |
+
+Can be overridden per-VM to set different frequencies (e.g., A100 VMs every 30 min, T4 every 2 hours).
+
 ### defaults.metric_sources
+
+If the primary source returns `None`, the system falls back to SSH automatically.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `gpu_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
 | `cpu_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
 | `memory_utilization` | string | `monitoring_api` | `monitoring_api` or `ssh` |
+| `disk_utilization` | string | `ssh` | `monitoring_api` or `ssh` |
 | `process_count` | string | `ssh` | Always `ssh` |
 
 ### defaults.process_monitoring

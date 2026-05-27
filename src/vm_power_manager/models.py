@@ -70,10 +70,20 @@ class GpuProtectionConfig(BaseModel):
     notify_on_zone_change: bool = True
 
 
+class GpuMonitoringConfig(BaseModel):
+    """Alerts for GPU VMs running continuously."""
+
+    enabled: bool = True
+    alert_interval_minutes: int = 60
+    alert_after_minutes: int = 60
+    include_in_regular_check: bool = True
+
+
 class MetricSources(BaseModel):
     gpu_utilization: MetricSource = MetricSource.MONITORING_API
     cpu_utilization: MetricSource = MetricSource.MONITORING_API
     memory_utilization: MetricSource = MetricSource.MONITORING_API
+    disk_utilization: MetricSource = MetricSource.SSH
     process_count: MetricSource = MetricSource.SSH
 
 
@@ -98,6 +108,7 @@ class VMDefaults(BaseModel):
     metric_sources: MetricSources = Field(default_factory=MetricSources)
     process_monitoring: ProcessMonitoringConfig = Field(default_factory=ProcessMonitoringConfig)
     gpu_protection: GpuProtectionConfig = Field(default_factory=GpuProtectionConfig)
+    gpu_monitoring: GpuMonitoringConfig = Field(default_factory=GpuMonitoringConfig)
     disable_auto_upgrades: bool = True
     pre_stop_commands: list[str] = Field(default_factory=list)
     post_start_commands: list[str] = Field(default_factory=list)
@@ -141,6 +152,7 @@ class VMConfig(BaseModel):
     metric_sources: MetricSources | None = None
     process_monitoring: ProcessMonitoringConfig | None = None
     gpu_protection: GpuProtectionConfig | None = None
+    gpu_monitoring: GpuMonitoringConfig | None = None
     disable_auto_upgrades: bool | None = None
     pre_stop_commands: list[str] | None = None
     post_start_commands: list[str] | None = None
@@ -181,6 +193,7 @@ class VMConfig(BaseModel):
             metric_sources=self.metric_sources or defaults.metric_sources,
             process_monitoring=self.process_monitoring or defaults.process_monitoring,
             gpu_protection=self.gpu_protection or defaults.gpu_protection,
+            gpu_monitoring=self.gpu_monitoring or defaults.gpu_monitoring,
             disable_auto_upgrades=(
                 self.disable_auto_upgrades
                 if self.disable_auto_upgrades is not None
@@ -230,6 +243,7 @@ class ResolvedVMConfig(BaseModel):
     metric_sources: MetricSources
     process_monitoring: ProcessMonitoringConfig
     gpu_protection: GpuProtectionConfig
+    gpu_monitoring: GpuMonitoringConfig = Field(default_factory=GpuMonitoringConfig)
     disable_auto_upgrades: bool
     pre_stop_commands: list[str]
     post_start_commands: list[str]
@@ -302,6 +316,7 @@ class VMState(BaseModel):
     paused_at: datetime | None = None
     last_checked: datetime | None = None
     session_started: datetime | None = None
+    last_gpu_alert_sent: datetime | None = None
     last_metrics: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -311,6 +326,7 @@ class MetricSnapshot(BaseModel):
     gpu_utilization: float | None = None
     cpu_utilization: float | None = None
     memory_utilization: float | None = None
+    disk_utilization: float | None = None
     active_process_count: int = 0
     active_processes: list[dict[str, str]] = Field(default_factory=list)
     active_sessions: int = 0

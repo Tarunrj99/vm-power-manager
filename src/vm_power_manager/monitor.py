@@ -28,6 +28,8 @@ def check_all_vms(config: Config, state_backend: StateBackend) -> list[dict]:
     Always collects metrics and stores state. Only takes stop action
     if auto_stop_enabled is true for the VM.
 
+    Also checks GPU VMs for continuous-running alerts.
+
     Returns a list of actions taken (for reporting/logging):
     [{"vm": name, "action": "warning"|"stop"|"reset"|"skip", "metrics": {...}}]
     """
@@ -40,6 +42,11 @@ def check_all_vms(config: Config, state_backend: StateBackend) -> list[dict]:
         try:
             result = _check_single_vm(resolved, config, state_backend)
             actions.append(result)
+
+            # GPU continuous running alert check
+            gpu_alert = _check_gpu_running_alert(resolved, state_backend)
+            if gpu_alert:
+                actions.append(gpu_alert)
         except Exception as e:
             logger.error(f"Error checking VM {resolved.name}: {e}", exc_info=True)
             actions.append({"vm": resolved.name, "action": "error", "error": str(e)})
@@ -194,55 +201,98 @@ def _stop_vm(vm_config: ResolvedVMConfig, adapter: VMAdapter, state: VMState) ->
 
 
 def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
-    """Collect all relevant metrics for a VM."""
+    """Collect all relevant metrics for a VM with fallback to SSH if primary source fails."""
     gpu = None
     cpu = None
     memory = None
-    active_processes = []
-    active_sessions = []
+    disk = None
 
     from vm_power_manager.adapters.ssh import SSHAdapter
     from vm_power_manager.metrics.monitoring_api import MonitoringAPICollector
     from vm_power_manager.metrics.ssh_metrics import SSHMetricCollector
 
-    # GPU
+    # Lazy SSH setup — only created if needed
+    _ssh = None
+    _ssh_collector = None
+
+    def _get_ssh():
+        nonlocal _ssh, _ssh_collector
+        if _ssh is None:
+            _ssh = SSHAdapter(vm_config)
+            _ssh_collector = SSHMetricCollector(vm_config, _ssh)
+        return _ssh_collector
+
+    # GPU (with fallback)
     source = vm_config.metric_sources.gpu_utilization
     if source == MetricSource.MONITORING_API:
         collector = MonitoringAPICollector(vm_config)
         gpu = collector.get_gpu_utilization()
+        if gpu is None:
+            try:
+                gpu = _get_ssh().get_gpu_utilization()
+            except Exception:
+                pass
     elif source == MetricSource.SSH:
-        ssh = SSHAdapter(vm_config)
-        ssh_collector = SSHMetricCollector(vm_config, ssh)
-        gpu = ssh_collector.get_gpu_utilization()
+        try:
+            gpu = _get_ssh().get_gpu_utilization()
+        except Exception:
+            pass
 
-    # CPU
+    # CPU (with fallback)
     source = vm_config.metric_sources.cpu_utilization
     if source == MetricSource.MONITORING_API:
         collector = MonitoringAPICollector(vm_config)
         cpu = collector.get_cpu_utilization()
+        if cpu is None:
+            try:
+                cpu = _get_ssh().get_cpu_utilization()
+            except Exception:
+                pass
     elif source == MetricSource.SSH:
-        ssh = SSHAdapter(vm_config)
-        ssh_collector = SSHMetricCollector(vm_config, ssh)
-        cpu = ssh_collector.get_cpu_utilization()
+        try:
+            cpu = _get_ssh().get_cpu_utilization()
+        except Exception:
+            pass
 
-    # Memory
+    # Memory (with fallback)
     source = vm_config.metric_sources.memory_utilization
     if source == MetricSource.MONITORING_API:
         collector = MonitoringAPICollector(vm_config)
         memory = collector.get_memory_utilization()
+        if memory is None:
+            try:
+                memory = _get_ssh().get_memory_utilization()
+            except Exception:
+                pass
     elif source == MetricSource.SSH:
-        ssh = SSHAdapter(vm_config)
-        ssh_collector = SSHMetricCollector(vm_config, ssh)
-        memory = ssh_collector.get_memory_utilization()
+        try:
+            memory = _get_ssh().get_memory_utilization()
+        except Exception:
+            pass
+
+    # Disk
+    source = vm_config.metric_sources.disk_utilization
+    if source == MetricSource.MONITORING_API:
+        collector = MonitoringAPICollector(vm_config)
+        disk = collector.get_disk_utilization()
+        if disk is None:
+            try:
+                disk = _get_ssh().get_disk_utilization()
+            except Exception:
+                pass
+    elif source == MetricSource.SSH:
+        try:
+            disk = _get_ssh().get_disk_utilization()
+        except Exception:
+            pass
 
     # Process count (always via SSH)
     process_result = None
     if vm_config.metric_sources.process_count == MetricSource.SSH:
         try:
-            ssh = SSHAdapter(vm_config)
-            ssh_collector = SSHMetricCollector(vm_config, ssh)
-            ps_output = ssh_collector.get_processes()
-            session_users = ssh_collector.get_active_sessions()
+            ssh_col = _get_ssh()
+            ps_output = ssh_col.get_processes()
+            session_users = ssh_col.get_active_sessions()
 
             process_result = detect_processes(
                 ps_output, session_users, vm_config.process_monitoring
@@ -254,6 +304,7 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
         gpu_utilization=gpu,
         cpu_utilization=cpu,
         memory_utilization=memory,
+        disk_utilization=disk,
         active_process_count=process_result.active_count if process_result else 0,
         active_processes=[
             {"user": p.user, "pid": str(p.pid), "cmd": p.full_command[:100]}
@@ -295,6 +346,50 @@ def _evaluate_idle(metrics: MetricSnapshot, vm_config: ResolvedVMConfig) -> bool
         return gpu_idle and cpu_idle and process_idle
 
     return False
+
+
+def _check_gpu_running_alert(
+    vm_config: ResolvedVMConfig,
+    state_backend: StateBackend,
+) -> dict | None:
+    """Check if a GPU VM has been running long enough to trigger an informational alert."""
+    if not vm_config.gpu_type:
+        return None
+
+    gpu_mon = vm_config.gpu_monitoring
+    if not gpu_mon.enabled or not gpu_mon.include_in_regular_check:
+        return None
+
+    state = state_backend.get(vm_config.name)
+    if not state or not state.session_started:
+        return None
+
+    now = datetime.now(timezone.utc)
+    running_minutes = (now - state.session_started).total_seconds() / 60
+
+    if running_minutes < gpu_mon.alert_after_minutes:
+        return None
+
+    # Check if enough time has passed since last GPU alert
+    if state.last_gpu_alert_sent:
+        since_last = (now - state.last_gpu_alert_sent).total_seconds() / 60
+        if since_last < gpu_mon.alert_interval_minutes:
+            return None
+
+    # Fire the alert
+    state.last_gpu_alert_sent = now
+    state_backend.set(vm_config.name, state)
+
+    hours = int(running_minutes // 60)
+    mins = int(running_minutes % 60)
+    uptime_str = f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+
+    return {
+        "vm": vm_config.name,
+        "action": "gpu_running_alert",
+        "uptime": uptime_str,
+        "metrics": state.last_metrics,
+    }
 
 
 def _get_vm_adapter(vm_config: ResolvedVMConfig) -> VMAdapter:
