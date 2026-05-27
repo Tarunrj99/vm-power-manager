@@ -14,6 +14,7 @@ from urllib.parse import parse_qs
 import requests as http_requests
 
 from vm_power_manager.config import get_slack_signing_secret, get_slack_token, load_config
+from vm_power_manager.manifest import check_manifest
 from vm_power_manager.models import Config, MetricSnapshot, ResolvedVMConfig, VMState
 from vm_power_manager.monitor import check_all_vms
 from vm_power_manager.slack.commands import handle_command
@@ -36,6 +37,11 @@ def check_idle(config: str | Path | Config) -> dict:
     """
     if isinstance(config, (str, Path)):
         config = load_config(config)
+
+    # Runtime manifest check (version compatibility)
+    manifest_result = _check_manifest_gate(config)
+    if manifest_result is not None:
+        return manifest_result
 
     state_backend = create_state_backend(config)
     actions = check_all_vms(config, state_backend)
@@ -65,6 +71,18 @@ def handle_slack(request, config: str | Path | Config) -> dict:
     """
     if isinstance(config, (str, Path)):
         config = load_config(config)
+
+    # Runtime manifest check (version compatibility)
+    manifest_status = check_manifest(
+        config.app.manifest.model_dump() if config.app.manifest else {},
+        deployment_id=config.app.deployment_id,
+    )
+    if not manifest_status.allow:
+        logger.warning(f"vm_power_manager: suppressed by manifest ({manifest_status.reason})")
+        return {
+            "response_type": "ephemeral",
+            "text": ":warning: VM Power Manager is temporarily unavailable. Please try again later.",
+        }
 
     # Verify Slack signature
     if not _verify_slack_signature(request, config):
@@ -141,6 +159,23 @@ def handle_slack(request, config: str | Path | Config) -> dict:
         return {"text": "Unsupported JSON payload."}
 
     return {"text": "Unsupported content type."}
+
+
+def _check_manifest_gate(config: Config) -> dict | None:
+    """Check runtime manifest. Returns an error dict if blocked, None if allowed."""
+    manifest_status = check_manifest(
+        config.app.manifest.model_dump() if config.app.manifest else {},
+        deployment_id=config.app.deployment_id,
+    )
+    if not manifest_status.allow:
+        logger.warning(f"vm_power_manager: suppressed by manifest ({manifest_status.reason})")
+        return {
+            "status": "suppressed",
+            "reason": manifest_status.reason,
+            "vms_checked": 0,
+            "actions": [],
+        }
+    return None
 
 
 def _get_form_value(form_data: dict, key: str, default: str = "") -> str:

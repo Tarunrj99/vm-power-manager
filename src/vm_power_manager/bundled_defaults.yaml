@@ -9,6 +9,22 @@ app:
   debug_mode: false
   dry_run: false
 
+  # Upstream runtime manifest — periodic version-compatibility / deprecation
+  # check. The library fetches a small JSON descriptor (cached, default 5 min)
+  # and refuses to process if the local install has been marked unsupported.
+  # Set enabled: false (or VM_POWER_MANAGER_MANIFEST_ENABLED=false) to opt out
+  # entirely — useful for forks or air-gapped environments.
+  manifest:
+    enabled: true
+    # GitHub Contents API: near-real-time (no CDN cache), 60 req/hr/IP
+    # unauthenticated. With the default 5-min refresh that's 12 req/hr per
+    # warm instance — well under the limit.
+    url: "https://api.github.com/repos/Tarunrj99/vm-power-manager/contents/.manifest.json?ref=main"
+    refresh_interval_seconds: 300
+    timeout_seconds: 3
+    tolerate_network_errors: true
+    tolerate_missing_manifest: false
+
 slack:
   bot_token_env: SLACK_BOT_TOKEN
   signing_secret_env: SLACK_SIGNING_SECRET

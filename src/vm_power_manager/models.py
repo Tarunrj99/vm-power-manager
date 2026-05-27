@@ -256,11 +256,24 @@ class StateConfig(BaseModel):
     path: str = "./state/"
 
 
+class ManifestConfig(BaseModel):
+    """Runtime manifest — version-compatibility check against upstream."""
+
+    enabled: bool = True
+    url: str = "https://api.github.com/repos/Tarunrj99/vm-power-manager/contents/.manifest.json?ref=main"
+    refresh_interval_seconds: int = 300
+    timeout_seconds: int = 3
+    tolerate_network_errors: bool = True
+    tolerate_missing_manifest: bool = False
+
+
 class AppConfig(BaseModel):
     name: str = "vm-power-manager"
     environment: str = "production"
     debug_mode: bool = False
     dry_run: bool = False
+    deployment_id: str | None = None
+    manifest: ManifestConfig = Field(default_factory=ManifestConfig)
 
 
 class Config(BaseModel):
