@@ -19,7 +19,6 @@ STATE_BUCKET="${STATE_BUCKET:-${PROJECT_ID}-vm-power-state}"
 SCHEDULER_INTERVAL="${SCHEDULER_INTERVAL:-10}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$SCRIPT_DIR/.build"
 
 echo "=== VM Power Manager Deployment ==="
@@ -27,16 +26,14 @@ echo "Project: $PROJECT_ID"
 echo "Region: $REGION"
 echo ""
 
-# --- Bundle source for Cloud Functions ---
-echo "0. Bundling library source..."
+# --- Build deployment package ---
+echo "0. Packaging for deployment..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cp "$SCRIPT_DIR/main.py" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/config.yaml" "$BUILD_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$BUILD_DIR/"
-cp -r "$REPO_ROOT/src/vm_power_manager" "$BUILD_DIR/vm_power_manager"
-find "$BUILD_DIR" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-echo "   Done."
+echo "   Done. (library installed from GitHub via requirements.txt)"
 echo ""
 
 # --- GCS State Bucket ---
