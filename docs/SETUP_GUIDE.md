@@ -10,7 +10,7 @@ Complete step-by-step guide to deploy VM Power Manager on GCP Cloud Functions wi
 |-------------|-----|
 | GCP project with **Compute Engine API** enabled | VM start/stop operations |
 | **Ops Agent** installed on managed VMs | Cloud Monitoring metrics (GPU, CPU, memory, disk) |
-| SSH key pair (optional) | Fallback metrics + process monitoring. See [SSH_METRICS.md](SSH_METRICS.md) |
+| SSH key pair (optional) | Fallback metrics + process monitoring. See [METRICS_SETUP.md](METRICS_SETUP.md) |
 | Python 3.11+ | Local testing only |
 | `gcloud` CLI authenticated | Deployment |
 | Slack workspace (admin access recommended) | Bot creation |
@@ -216,8 +216,8 @@ Your Slack username is not in the `notify_users` list for that VM. Update `confi
 | Disk | Install Ops Agent **or** configure SSH keys |
 
 **Quick fixes:**
-1. Install the **Ops Agent** on each VM (see [SSH_METRICS.md](SSH_METRICS.md#option-a-install-ops-agent-recommended-for-cloud-functions))
-2. Or configure **SSH keys** for the Cloud Function (see [SSH_METRICS.md](SSH_METRICS.md#option-b-configure-ssh-keys-for-full-metrics--process-monitoring))
+1. Install the **Ops Agent** on each VM (see [METRICS_SETUP.md](METRICS_SETUP.md#method-1-gcp-ops-agent))
+2. Or configure **SSH keys** for the Cloud Function (see [METRICS_SETUP.md](METRICS_SETUP.md#method-2-ssh-keys-universal))
 3. Verify the function's service account has `monitoring.timeSeries.list` permission
 4. Metrics populate after the monitor function runs (every 10 min)
 

@@ -343,6 +343,7 @@ vms:
 |-----|-------|
 | [CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md) | Every config key, with examples |
 | [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | End-to-end: GCP + Slack setup |
+| [METRICS_SETUP.md](docs/METRICS_SETUP.md) | Metric collection: Ops Agent vs SSH, setup for GCP/AWS/any VM |
 | [GPU_AVAILABILITY.md](docs/GPU_AVAILABILITY.md) | GPU unavailability after stop: problem, prevention, fallback |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, PR checklist |
 | [SECURITY.md](SECURITY.md) | Disclosure policy |
