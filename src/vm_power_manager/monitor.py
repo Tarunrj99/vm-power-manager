@@ -65,8 +65,16 @@ def _check_single_vm(
     # Get VM adapter
     adapter = _get_vm_adapter(vm_config)
 
-    # Skip if VM is not running
+    # Skip if VM is not running — also clear stale session state
     if not adapter.is_running():
+        state = state_backend.get(vm_config.name)
+        if state and state.session_started:
+            state.session_started = None
+            state.idle_since = None
+            state.idle_minutes = 0
+            state.warning_sent = False
+            state.warning_sent_at = None
+            state_backend.set(vm_config.name, state)
         return {"vm": vm_config.name, "action": "skip", "reason": "not_running"}
 
     # Get current state
