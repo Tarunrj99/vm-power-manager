@@ -43,7 +43,7 @@ defaults:
     gpu_utilization: "monitoring_api"
     cpu_utilization: "monitoring_api"
     memory_utilization: "monitoring_api"
-    disk_utilization: "ssh"
+    disk_utilization: "monitoring_api"
     process_count: "ssh"
 
   process_monitoring:

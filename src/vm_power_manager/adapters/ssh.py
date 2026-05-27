@@ -21,14 +21,37 @@ class SSHAdapter(VMAdapter):
     Supports start/stop only if the VM has a cloud API fallback
     or if custom commands are provided. Primarily used for metric
     collection on any reachable VM.
+
+    For GCP VMs without ssh_host set, resolves the external IP from
+    the Compute API automatically.
     """
 
     def __init__(self, vm_config: ResolvedVMConfig):
         self._config = vm_config
-        self._host = vm_config.ssh_host or vm_config.gcp_name
+        self._host = vm_config.ssh_host or self._resolve_host(vm_config)
         self._user = vm_config.ssh_user
         self._port = vm_config.ssh_port
         self._key_env = vm_config.ssh_key_env
+
+    @staticmethod
+    def _resolve_host(vm_config: ResolvedVMConfig) -> str:
+        """Resolve SSH host — for GCP VMs, get external IP from Compute API."""
+        if vm_config.cloud.value == "gcp" and vm_config.project and vm_config.zone:
+            try:
+                from google.cloud import compute_v1
+                client = compute_v1.InstancesClient()
+                instance = client.get(
+                    project=vm_config.project,
+                    zone=vm_config.zone,
+                    instance=vm_config.gcp_name or vm_config.name,
+                )
+                for iface in instance.network_interfaces:
+                    for access in iface.access_configs:
+                        if access.nat_i_p:
+                            return access.nat_i_p
+            except Exception as e:
+                logger.warning(f"Could not resolve GCP external IP for {vm_config.name}: {e}")
+        return vm_config.gcp_name or vm_config.name
 
     def _get_client(self) -> paramiko.SSHClient:
         client = paramiko.SSHClient()
@@ -44,7 +67,13 @@ class SSHAdapter(VMAdapter):
         if self._key_env:
             key_path = os.environ.get(self._key_env)
             if key_path:
-                connect_kwargs["key_filename"] = key_path
+                if os.path.isfile(key_path):
+                    connect_kwargs["key_filename"] = key_path
+                else:
+                    # Treat as inline key content (for Cloud Functions / serverless)
+                    import io
+                    pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_path))
+                    connect_kwargs["pkey"] = pkey
 
         client.connect(**connect_kwargs)
         return client

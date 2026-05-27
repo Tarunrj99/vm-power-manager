@@ -83,7 +83,7 @@ class MetricSources(BaseModel):
     gpu_utilization: MetricSource = MetricSource.MONITORING_API
     cpu_utilization: MetricSource = MetricSource.MONITORING_API
     memory_utilization: MetricSource = MetricSource.MONITORING_API
-    disk_utilization: MetricSource = MetricSource.SSH
+    disk_utilization: MetricSource = MetricSource.MONITORING_API
     process_count: MetricSource = MetricSource.SSH
 
 

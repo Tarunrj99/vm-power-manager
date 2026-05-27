@@ -360,6 +360,14 @@ def _check_gpu_running_alert(
     if not gpu_mon.enabled or not gpu_mon.include_in_regular_check:
         return None
 
+    # Verify VM is actually running before alerting
+    try:
+        adapter = _get_vm_adapter(vm_config)
+        if not adapter.is_running():
+            return None
+    except Exception:
+        return None
+
     state = state_backend.get(vm_config.name)
     if not state or not state.session_started:
         return None
