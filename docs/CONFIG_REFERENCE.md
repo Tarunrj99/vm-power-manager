@@ -18,6 +18,20 @@
 | `environment` | string | `production` | Environment tag |
 | `debug_mode` | bool | `false` | Verbose logging |
 | `dry_run` | bool | `false` | Alerts but doesn't stop VMs |
+| `deployment_id` | string | `null` | Unique ID for this deployment (optional) |
+
+### app.manifest
+
+Runtime version-compatibility check. The library periodically fetches a small JSON descriptor from upstream to verify the installed version is still supported. Disable for air-gapped environments or forks.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Enable/disable the check |
+| `url` | string | _(GitHub API)_ | URL to fetch the manifest from |
+| `refresh_interval_seconds` | int | `300` | Cache TTL between checks |
+| `timeout_seconds` | int | `3` | HTTP fetch timeout |
+| `tolerate_network_errors` | bool | `true` | Transient errors don't block operation |
+| `tolerate_missing_manifest` | bool | `false` | If manifest is missing (404), block or allow |
 
 ### slack
 
@@ -41,6 +55,20 @@
 | `disable_auto_upgrades` | bool | `true` | Disable unattended-upgrades |
 | `pre_stop_commands` | list | `[]` | Commands before stop |
 | `post_start_commands` | list | `[]` | Commands after start |
+
+### defaults.gpu_protection
+
+Prevents GPU unavailability after VM stop. See [GPU_AVAILABILITY.md](GPU_AVAILABILITY.md) for full details.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Enable GPU protection features |
+| `check_before_stop` | bool | `true` | Warn via Slack before stopping GPU VMs |
+| `fallback_zones` | list | `[]` | Zones to try if original zone is exhausted |
+| `max_start_retries` | int | `3` | Retries in original zone before fallback |
+| `retry_delay_seconds` | int | `30` | Delay between retries |
+| `auto_migrate` | bool | `false` | Auto-migrate VM to fallback zone on failure |
+| `notify_on_zone_change` | bool | `true` | Slack alert when VM migrates to new zone |
 
 ### defaults.metric_sources
 

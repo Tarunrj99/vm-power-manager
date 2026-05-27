@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] — 2026-05-27
+
+### Added
+
+- **GPU availability protection**: Pre-stop warning when GPU capacity is at risk, multi-zone start with retry + fallback zones, optional auto-migrate
+- **Runtime version-compatibility check**: Periodic upstream manifest check (`.manifest.json`) ensures local installs are compatible; opt-out via `app.manifest.enabled: false`
+- `GpuProtectionConfig` model with per-VM and default-level configuration
+- `check_gpu_availability()` and `start_with_gpu_protection()` in GCP adapter
+- Slack confirmation flow ("Stop Anyway" / "Keep Running") for GPU VMs without reservations
+- `docs/GPU_AVAILABILITY.md` — guide on GPU unavailability and prevention strategies
+- `scripts/gpu-reservation-setup.sh` — helper for creating GCP GPU reservations
+- Deploy now uses pip install from pinned release tag (no more bundled source)
+
+### Changed
+
+- `config.example.yaml` updated with `gpu_protection` and `manifest` examples
+- Version bumped to 1.1.0
+- `examples/gcp-cloud-function/requirements.txt` now installs from GitHub tag
+
 ## [1.0.0] — 2026-05-26
 
 ### Added

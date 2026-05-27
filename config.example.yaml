@@ -11,6 +11,12 @@ app:
   environment: production
   # debug_mode: true     # Verbose logging
   # dry_run: true        # Alerts only, no VM actions
+  # deployment_id: "my-deployment"   # Unique ID for this deployment (optional)
+
+  # Runtime version-compatibility check (fetches .manifest.json from upstream).
+  # Disable for air-gapped environments or forks.
+  # manifest:
+  #   enabled: false
 
 slack:
   default_channel: "#vm-alerts"
