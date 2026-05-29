@@ -80,6 +80,10 @@ def _check_single_vm(
     # Get current state
     state = state_backend.get_or_create(vm_config.name)
 
+    # Track session start — set once when VM is first detected running
+    if state.session_started is None:
+        state.session_started = now
+
     # Check if monitoring is paused
     if state.paused:
         return {"vm": vm_config.name, "action": "skip", "reason": "paused"}
