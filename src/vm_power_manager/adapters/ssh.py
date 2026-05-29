@@ -80,7 +80,19 @@ class SSHAdapter(VMAdapter):
                         except Exception:
                             pass
 
-                    pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_value))
+                    key_file = io.StringIO(key_value)
+                    # Try RSA first, then Ed25519, then generic
+                    pkey = None
+                    for key_class in (paramiko.RSAKey, paramiko.Ed25519Key, paramiko.ECDSAKey):
+                        try:
+                            key_file.seek(0)
+                            pkey = key_class.from_private_key(key_file)
+                            break
+                        except Exception:
+                            continue
+
+                    if pkey is None:
+                        raise ValueError(f"Could not load SSH key from env var {self._key_env}")
                     connect_kwargs["pkey"] = pkey
 
         client.connect(**connect_kwargs)

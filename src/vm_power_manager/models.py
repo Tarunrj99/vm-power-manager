@@ -113,6 +113,9 @@ class VMDefaults(BaseModel):
     pre_stop_commands: list[str] = Field(default_factory=list)
     post_start_commands: list[str] = Field(default_factory=list)
     notifications: NotificationConfig = Field(default_factory=NotificationConfig)
+    ssh_user: str = "root"
+    ssh_key_env: str | None = None
+    ssh_port: int = 22
 
 
 class VMConfig(BaseModel):
@@ -170,9 +173,9 @@ class VMConfig(BaseModel):
             instance_id=self.instance_id,
             region=self.region,
             ssh_host=self.ssh_host,
-            ssh_user=self.ssh_user,
-            ssh_key_env=self.ssh_key_env,
-            ssh_port=self.ssh_port,
+            ssh_user=self.ssh_user if self.ssh_user != "root" else defaults.ssh_user,
+            ssh_key_env=self.ssh_key_env or defaults.ssh_key_env,
+            ssh_port=self.ssh_port if self.ssh_port != 22 else defaults.ssh_port,
             channel=self.channel,
             notify_users=self.notify_users,
             access_control=self.access_control or AccessControlMode.MENTIONED_ONLY,
