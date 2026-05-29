@@ -327,9 +327,16 @@ class MetricSnapshot(BaseModel):
     """Point-in-time metrics for a VM."""
 
     gpu_utilization: float | None = None
+    gpu_memory_used_mb: float | None = None
+    gpu_memory_total_mb: float | None = None
     cpu_utilization: float | None = None
+    cpu_cores: int | None = None
     memory_utilization: float | None = None
+    memory_used_mb: float | None = None
+    memory_total_mb: float | None = None
     disk_utilization: float | None = None
+    disk_used_gb: float | None = None
+    disk_total_gb: float | None = None
     active_process_count: int = 0
     active_processes: list[dict[str, str]] = Field(default_factory=list)
     active_sessions: int = 0

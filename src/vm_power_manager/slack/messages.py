@@ -303,17 +303,20 @@ class MessageBuilder:
                 status_text = "Running" if vm.get("running") else "Stopped"
                 uptime = vm.get("uptime", "—")
                 gpu = _fmt_pct(vm.get("gpu"))
+                gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
                 cpu = _fmt_pct(vm.get("cpu"))
-                mem = _fmt_pct(vm.get("memory"))
-                disk = _fmt_pct(vm.get("disk"))
+                cores = vm.get("cpu_cores")
+                cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+                mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+                disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
                 procs = vm.get("processes", 0)
                 gpu_type = vm.get("gpu_type", "—")
 
                 text = (
                     f"{status_emoji} *{vm['name']}* — _{status_text}_\n"
-                    f"  GPU Type: `{gpu_type}` | Uptime: `{uptime}`\n"
-                    f"  GPU: `{gpu}` | CPU: `{cpu}` | MEM: `{mem}` | Disk: `{disk}`\n"
-                    f"  Processes: `{procs}`"
+                    f"  GPU: `{gpu_type}` | Util: `{gpu}` | VRAM: `{gpu_mem}`\n"
+                    f"  CPU: `{cpu_str}` | RAM: `{mem}`\n"
+                    f"  Disk: `{disk}` | Procs: `{procs}` | Uptime: `{uptime}`"
                 )
                 blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
 
@@ -329,8 +332,14 @@ class MessageBuilder:
                 status_text = "Running" if vm.get("running") else "Stopped"
                 uptime = vm.get("uptime", "—")
                 cpu = _fmt_pct(vm.get("cpu"))
-                mem = _fmt_pct(vm.get("memory"))
-                text = f"{status_emoji} *{vm['name']}* — _{status_text}_ | Uptime: `{uptime}` | CPU: `{cpu}` | MEM: `{mem}`"
+                cores = vm.get("cpu_cores")
+                cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+                mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+                disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
+                text = (
+                    f"{status_emoji} *{vm['name']}* — _{status_text}_\n"
+                    f"  CPU: `{cpu_str}` | RAM: `{mem}` | Disk: `{disk}` | Uptime: `{uptime}`"
+                )
                 blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": text}})
 
         if not vm_summaries:
@@ -348,9 +357,12 @@ class MessageBuilder:
     def gpu_running_alert(vm_config, metrics: dict, uptime: str) -> dict:
         """Informational alert: GPU VM has been running continuously."""
         gpu = _fmt_pct(metrics.get("gpu_utilization"))
+        gpu_mem = _fmt_mem_mb(metrics.get("gpu_memory_used_mb"), metrics.get("gpu_memory_total_mb"))
         cpu = _fmt_pct(metrics.get("cpu_utilization"))
-        mem = _fmt_pct(metrics.get("memory_utilization"))
-        disk = _fmt_pct(metrics.get("disk_utilization"))
+        cores = metrics.get("cpu_cores")
+        cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+        mem = _fmt_mem(metrics.get("memory_utilization"), metrics.get("memory_used_mb"), metrics.get("memory_total_mb"))
+        disk = _fmt_disk(metrics.get("disk_utilization"), metrics.get("disk_used_gb"), metrics.get("disk_total_gb"))
         procs = metrics.get("active_process_count", 0)
         gpu_type = vm_config.gpu_type or "—"
 
@@ -369,9 +381,9 @@ class MessageBuilder:
                         "text": (
                             f":rotating_light: *GPU VM Running:* `{vm_config.name}`\n"
                             f"Running for: *{uptime}*\n"
-                            f"GPU: `{gpu_type}` | Utilization: `{gpu}`\n"
-                            f"CPU: `{cpu}` | Memory: `{mem}` | Disk: `{disk}`\n"
-                            f"Processes: `{procs}` active{process_list}"
+                            f"GPU: `{gpu_type}` | Util: `{gpu}` | VRAM: `{gpu_mem}`\n"
+                            f"CPU: `{cpu_str}` | RAM: `{mem}`\n"
+                            f"Disk: `{disk}` | Procs: `{procs}` active{process_list}"
                         ),
                     },
                 },
@@ -529,19 +541,23 @@ def _build_gpu_vm_status_block(vm: dict) -> dict:
     if error:
         detail = f"_Error: {error[:80]}_"
     else:
+        gpu_type = vm.get("gpu_type", "—")
         gpu = _fmt_pct(vm.get("gpu"))
+        gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
         cpu = _fmt_pct(vm.get("cpu"))
-        mem = _fmt_pct(vm.get("memory"))
-        disk = _fmt_pct(vm.get("disk"))
+        cores = vm.get("cpu_cores")
+        cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+        mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+        disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
         procs = vm.get("processes", 0)
         ip = vm.get("ip") or "—"
-        gpu_type = vm.get("gpu_type", "—")
         uptime = vm.get("uptime", "—")
 
         detail = (
-            f"  GPU: `{gpu_type}` | Utilization: `{gpu}`\n"
-            f"  CPU: `{cpu}` | MEM: `{mem}` | Disk: `{disk}` | Procs: `{procs}`\n"
-            f"  Uptime: `{uptime}` | IP: `{ip}`"
+            f"  GPU: `{gpu_type}` | Util: `{gpu}` | VRAM: `{gpu_mem}`\n"
+            f"  CPU: `{cpu_str}` | RAM: `{mem}`\n"
+            f"  Disk: `{disk}` | Procs: `{procs}` | Uptime: `{uptime}`\n"
+            f"  IP: `{ip}`"
         )
 
     return {
@@ -560,9 +576,12 @@ def _build_standard_vm_status_block(vm: dict) -> dict:
         detail = f"_Error: {error[:80]}_"
     else:
         cpu = _fmt_pct(vm.get("cpu"))
-        mem = _fmt_pct(vm.get("memory"))
+        cores = vm.get("cpu_cores")
+        cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+        mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+        disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
         ip = vm.get("ip") or "—"
-        detail = f"  CPU: `{cpu}` | MEM: `{mem}` | IP: `{ip}`"
+        detail = f"  CPU: `{cpu_str}` | RAM: `{mem}` | Disk: `{disk}` | IP: `{ip}`"
 
     return {
         "type": "section",
@@ -578,3 +597,30 @@ def _fmt_pct(value) -> str:
         return f"{float(value):.1f}%"
     except (TypeError, ValueError):
         return "—"
+
+
+def _fmt_mem(pct, used_mb, total_mb) -> str:
+    """Format memory: '4.0% (3.4 / 85.0 GB)' or just percentage."""
+    pct_str = _fmt_pct(pct)
+    if used_mb is not None and total_mb is not None:
+        used_gb = used_mb / 1024
+        total_gb = total_mb / 1024
+        return f"{pct_str} ({used_gb:.1f}/{total_gb:.1f} GB)"
+    return pct_str
+
+
+def _fmt_mem_mb(used_mb, total_mb) -> str:
+    """Format GPU VRAM: '1.2 / 80.0 GB' or '—'."""
+    if used_mb is not None and total_mb is not None:
+        used_gb = used_mb / 1024
+        total_gb = total_mb / 1024
+        return f"{used_gb:.1f}/{total_gb:.1f} GB"
+    return "—"
+
+
+def _fmt_disk(pct, used_gb, total_gb) -> str:
+    """Format disk: '77% (1155 / 1500 GB)' or just percentage."""
+    pct_str = _fmt_pct(pct)
+    if used_gb is not None and total_gb is not None:
+        return f"{pct_str} ({used_gb:.0f}/{total_gb:.0f} GB)"
+    return pct_str

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] — 2026-05-30
+
+### Added
+
+- **Exact metric values**: All metrics now report absolute values alongside percentages — RAM (used/total GB), Disk (used/total GB), GPU VRAM (used/total GB), CPU core count
+- **New fields in `MetricSnapshot`**: `gpu_memory_used_mb`, `gpu_memory_total_mb`, `cpu_cores`, `memory_used_mb`, `memory_total_mb`, `disk_used_gb`, `disk_total_gb`
+- **Enhanced SSH collector**: `get_gpu_memory()`, `get_cpu_cores()`, `get_memory_info()`, `get_disk_info()` — return exact values alongside percentages
+- **Rich Slack displays**: Status, daily digest, and GPU alerts now show e.g. "RAM: 14.1% (22.9/162.8 GB)" and "Disk: 18% (259/1454 GB)"
+
+### Changed
+
+- Replaced `featuresurface-ai-vm-01` with `featuresurface-ai-vm-02` (nvidia-a100-80gb, a2-ultragpu-1g)
+- Status/daily templates redesigned: show VRAM, core count, total/used for memory and disk
+- `_collect_metrics()` gathers exact values for all metric types when SSH is available
+- GPU running alert and daily digest templates updated with exact values
+- Bumped to v1.3.0
+
 ## [1.2.0] — 2026-05-27
 
 ### Added

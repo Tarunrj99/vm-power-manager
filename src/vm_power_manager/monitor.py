@@ -211,15 +211,21 @@ def _stop_vm(vm_config: ResolvedVMConfig, adapter: VMAdapter, state: VMState) ->
 def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
     """Collect all relevant metrics for a VM with fallback to SSH if primary source fails."""
     gpu = None
+    gpu_mem_used = None
+    gpu_mem_total = None
     cpu = None
+    cpu_cores = None
     memory = None
+    mem_used = None
+    mem_total = None
     disk = None
+    disk_used = None
+    disk_total = None
 
     from vm_power_manager.adapters.ssh import SSHAdapter
     from vm_power_manager.metrics.monitoring_api import MonitoringAPICollector
     from vm_power_manager.metrics.ssh_metrics import SSHMetricCollector
 
-    # Lazy SSH setup — only created if needed
     _ssh = None
     _ssh_collector = None
 
@@ -237,12 +243,21 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
         gpu = collector.get_gpu_utilization()
         if gpu is None:
             try:
-                gpu = _get_ssh().get_gpu_utilization()
+                ssh_col = _get_ssh()
+                gpu = ssh_col.get_gpu_utilization()
+                gpu_mem_used, gpu_mem_total = ssh_col.get_gpu_memory()
+            except Exception:
+                pass
+        else:
+            try:
+                gpu_mem_used, gpu_mem_total = _get_ssh().get_gpu_memory()
             except Exception:
                 pass
     elif source == MetricSource.SSH:
         try:
-            gpu = _get_ssh().get_gpu_utilization()
+            ssh_col = _get_ssh()
+            gpu = ssh_col.get_gpu_utilization()
+            gpu_mem_used, gpu_mem_total = ssh_col.get_gpu_memory()
         except Exception:
             pass
 
@@ -253,12 +268,21 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
         cpu = collector.get_cpu_utilization()
         if cpu is None:
             try:
-                cpu = _get_ssh().get_cpu_utilization()
+                ssh_col = _get_ssh()
+                cpu = ssh_col.get_cpu_utilization()
+                cpu_cores = ssh_col.get_cpu_cores()
+            except Exception:
+                pass
+        else:
+            try:
+                cpu_cores = _get_ssh().get_cpu_cores()
             except Exception:
                 pass
     elif source == MetricSource.SSH:
         try:
-            cpu = _get_ssh().get_cpu_utilization()
+            ssh_col = _get_ssh()
+            cpu = ssh_col.get_cpu_utilization()
+            cpu_cores = ssh_col.get_cpu_cores()
         except Exception:
             pass
 
@@ -269,28 +293,38 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
         memory = collector.get_memory_utilization()
         if memory is None:
             try:
-                memory = _get_ssh().get_memory_utilization()
+                memory, mem_used, mem_total = _get_ssh().get_memory_info()
+            except Exception:
+                pass
+        else:
+            try:
+                _, mem_used, mem_total = _get_ssh().get_memory_info()
             except Exception:
                 pass
     elif source == MetricSource.SSH:
         try:
-            memory = _get_ssh().get_memory_utilization()
+            memory, mem_used, mem_total = _get_ssh().get_memory_info()
         except Exception:
             pass
 
-    # Disk
+    # Disk (with fallback)
     source = vm_config.metric_sources.disk_utilization
     if source == MetricSource.MONITORING_API:
         collector = MonitoringAPICollector(vm_config)
         disk = collector.get_disk_utilization()
         if disk is None:
             try:
-                disk = _get_ssh().get_disk_utilization()
+                disk, disk_used, disk_total = _get_ssh().get_disk_info()
+            except Exception:
+                pass
+        else:
+            try:
+                _, disk_used, disk_total = _get_ssh().get_disk_info()
             except Exception:
                 pass
     elif source == MetricSource.SSH:
         try:
-            disk = _get_ssh().get_disk_utilization()
+            disk, disk_used, disk_total = _get_ssh().get_disk_info()
         except Exception:
             pass
 
@@ -310,9 +344,16 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
 
     return MetricSnapshot(
         gpu_utilization=gpu,
+        gpu_memory_used_mb=gpu_mem_used,
+        gpu_memory_total_mb=gpu_mem_total,
         cpu_utilization=cpu,
+        cpu_cores=cpu_cores,
         memory_utilization=memory,
+        memory_used_mb=mem_used,
+        memory_total_mb=mem_total,
         disk_utilization=disk,
+        disk_used_gb=disk_used,
+        disk_total_gb=disk_total,
         active_process_count=process_result.active_count if process_result else 0,
         active_processes=[
             {"user": p.user, "pid": str(p.pid), "cmd": p.full_command[:100]}
