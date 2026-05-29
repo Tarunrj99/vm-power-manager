@@ -65,14 +65,22 @@ class SSHAdapter(VMAdapter):
         }
 
         if self._key_env:
-            key_path = os.environ.get(self._key_env)
-            if key_path:
-                if os.path.isfile(key_path):
-                    connect_kwargs["key_filename"] = key_path
+            key_value = os.environ.get(self._key_env)
+            if key_value:
+                if os.path.isfile(key_value):
+                    connect_kwargs["key_filename"] = key_value
                 else:
-                    # Treat as inline key content (for Cloud Functions / serverless)
+                    import base64
                     import io
-                    pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_path))
+
+                    # Decode base64 if the value doesn't look like a PEM key
+                    if not key_value.startswith("-----"):
+                        try:
+                            key_value = base64.b64decode(key_value).decode("utf-8")
+                        except Exception:
+                            pass
+
+                    pkey = paramiko.RSAKey.from_private_key(io.StringIO(key_value))
                     connect_kwargs["pkey"] = pkey
 
         client.connect(**connect_kwargs)
