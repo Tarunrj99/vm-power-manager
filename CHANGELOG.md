@@ -17,7 +17,8 @@ All notable changes to this project will be documented in this file.
 - Status/daily templates redesigned: show VRAM, core count, total/used for memory and disk
 - `_collect_metrics()` gathers exact values for all metric types when SSH is available
 - GPU running alert and daily digest templates updated with exact values
-- Bumped to v1.3.0
+- When SSH provides exact values, percentage is computed from SSH data (more reliable than Monitoring API for some metrics)
+- Bumped to v1.3.1
 
 ## [1.2.0] — 2026-05-27
 
