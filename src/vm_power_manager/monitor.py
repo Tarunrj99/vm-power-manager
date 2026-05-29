@@ -298,7 +298,9 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
                 pass
         else:
             try:
-                _, mem_used, mem_total = _get_ssh().get_memory_info()
+                ssh_mem_pct, mem_used, mem_total = _get_ssh().get_memory_info()
+                if mem_used is not None and mem_total is not None and mem_total > 0:
+                    memory = round(mem_used / mem_total * 100, 1)
             except Exception:
                 pass
     elif source == MetricSource.SSH:
@@ -319,7 +321,9 @@ def _collect_metrics(vm_config: ResolvedVMConfig) -> MetricSnapshot:
                 pass
         else:
             try:
-                _, disk_used, disk_total = _get_ssh().get_disk_info()
+                ssh_disk_pct, disk_used, disk_total = _get_ssh().get_disk_info()
+                if disk_used is not None and disk_total is not None and disk_total > 0:
+                    disk = round(disk_used / disk_total * 100, 1)
             except Exception:
                 pass
     elif source == MetricSource.SSH:
