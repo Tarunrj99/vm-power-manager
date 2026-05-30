@@ -84,30 +84,41 @@ Declared in `pyproject.toml`:
 ## Architecture at a glance
 
 ```
-┌─────────────────────────┐
-│  Trigger                │  Cloud Scheduler · EventBridge · Cron
-│  (every 10 min)         │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐       ┌──────────────────────────────────┐
-│  Runtime wrapper        │──────▶│        vm_power_manager           │
-│  (Cloud Function,       │       │                                    │
-│   Lambda, FastAPI)      │       │  metrics → idle detect → notify → │
-│  ~10 lines of code      │       │  stop/start → lifecycle hooks      │
-└─────────────────────────┘       └──────────────┬───────────────────┘
-                                                  │
-            ┌─────────────────────────────────────┼───────────────┐
-            │                                     │               │
-            ▼                                     ▼               ▼
-┌───────────────────┐            ┌──────────────────┐  ┌─────────────────┐
-│  Cloud APIs       │            │  Slack           │  │  State Backend  │
-│  (Compute, Mon.)  │            │  (#vm-alerts)    │  │  (GCS/Redis/    │
-│  + SSH for procs  │            │                  │  │   File/etc.)    │
-└───────────────────┘            └──────────────────┘  └─────────────────┘
+┌─────────────────────────────┐
+│  Trigger                    │  Cloud Scheduler · EventBridge · Cron · Manual
+│  (configurable intervals)   │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐       ┌──────────────────────────────────────┐
+│  Runtime wrapper            │──────▶│         vm_power_manager              │
+│  (Cloud Function, Lambda,   │       │                                        │
+│   Cloud Run, FastAPI, Cron) │       │  collect → idle detect → notify →     │
+│  ~10 lines of code          │       │  stop/start → lifecycle hooks          │
+└─────────────────────────────┘       └──────────────┬─────────────────────────┘
+                                                     │
+         ┌───────────────────┬───────────────────────┼───────────────┐
+         │                   │                       │               │
+         ▼                   ▼                       ▼               ▼
+┌─────────────────┐ ┌─────────────────┐  ┌──────────────┐  ┌──────────────────┐
+│  Metric Sources │ │  VM Control     │  │  Slack       │  │  State Backend   │
+│                 │ │                 │  │  (alerts,    │  │                  │
+│  • SSH          │ │  • GCP API      │  │   commands,  │  │  • GCS Bucket    │
+│    (any VM:     │ │  • AWS EC2 API  │  │   buttons)   │  │  • Firestore     │
+│     nvidia-smi, │ │  • Azure API    │  │              │  │  • S3/DynamoDB   │
+│     ps, free,   │ │  • SSH (local)  │  │              │  │  • Redis         │
+│     df)         │ │                 │  │              │  │  • Local File    │
+│  • Cloud Mon.   │ └─────────────────┘  └──────────────┘  └──────────────────┘
+│    (Ops Agent)  │
+│  • CloudWatch   │
+└─────────────────┘
 ```
 
-The wrapper is platform-specific. Everything downstream is cloud-agnostic.
+**Key design principles:**
+- The runtime wrapper is platform-specific (~10 lines). Everything else is cloud-agnostic.
+- Metric collection works via **SSH** (any VM anywhere) or **Cloud Monitoring APIs** (GCP Ops Agent, AWS CloudWatch). You choose per-VM.
+- VM start/stop works via cloud APIs (GCP, AWS, Azure) or SSH commands.
+- All configuration lives in one YAML file — no code changes to add/remove VMs.
 
 ---
 
@@ -240,6 +251,36 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 
 ---
 
+## Metric collection options
+
+You choose how metrics are collected — per-VM, in `config.yaml`:
+
+| Method | Works on | Collects | Setup |
+|--------|----------|----------|-------|
+| **SSH** | Any VM (GCP, AWS, Azure, on-prem, local) | GPU (nvidia-smi), CPU, RAM, disk, processes | SSH key on VM |
+| **GCP Cloud Monitoring** (Ops Agent) | GCP VMs with Ops Agent installed | CPU, RAM, disk | Ops Agent + IAM |
+| **AWS CloudWatch** | EC2 instances | CPU, disk, network | IAM role |
+| **Hybrid** | GCP/AWS VMs | Cloud API for basic + SSH for GPU/processes | Both configured |
+
+**Recommended:** Use SSH for everything — it's the most reliable, works everywhere, and gives the most complete data (especially GPU metrics via `nvidia-smi`).
+
+```yaml
+defaults:
+  metric_sources:
+    gpu: ssh
+    cpu: ssh
+    memory: ssh
+    disk: ssh
+    processes: ssh
+  ssh:
+    user: "vm-power-manager"
+    key_env_var: "VM_SSH_KEY"
+```
+
+Full guide: [docs/METRICS_SETUP.md](docs/METRICS_SETUP.md).
+
+---
+
 ## Feature catalog
 
 | Feature | What it does | Status |
@@ -263,13 +304,17 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 
 ## Deployment recipes
 
-| Cloud | Runtime | Trigger | State Backend | Folder |
-|-------|---------|---------|---------------|--------|
-| GCP | Cloud Function (Gen 2) | Cloud Scheduler → Pub/Sub | GCS Bucket | `examples/gcp-cloud-function/` |
-| AWS | Lambda | EventBridge | S3 (future) | pattern identical |
-| Local | FastAPI | HTTP POST | File | `examples/local-dev/` |
+| Cloud | Runtime | Trigger | Metric Source | State Backend | Folder |
+|-------|---------|---------|---------------|---------------|--------|
+| GCP | Cloud Function (Gen 2) | Cloud Scheduler → Pub/Sub | SSH + Cloud Monitoring | GCS Bucket | `examples/gcp-cloud-function/` |
+| AWS | Lambda | EventBridge | SSH + CloudWatch | S3 / DynamoDB | pattern identical |
+| Azure | Azure Functions | Timer Trigger | SSH | Redis / File | pattern identical |
+| Any VM | Cron + FastAPI | Cron / HTTP POST | SSH | File / Redis | `examples/local-dev/` |
+| On-prem | Docker / systemd | Cron | SSH | File / Redis | pattern identical |
 
-Every recipe has the same shape: wrapper + `requirements.txt` + `config.yaml` + `deploy.sh`. The wrapper is never more than ~10 lines.
+Every recipe has the same shape: wrapper (~10 lines) + `requirements.txt` + `config.yaml` + `deploy.sh`.
+
+**SSH works everywhere** — if your VM is reachable via SSH (port 22), you can collect metrics and manage it regardless of cloud provider. No cloud-specific APIs required.
 
 ---
 
