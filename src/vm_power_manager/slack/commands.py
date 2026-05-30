@@ -68,15 +68,23 @@ def _handle_status(config: Config, state_backend: StateBackend) -> dict:
             state = state_backend.get(resolved.name)
             metrics = state.last_metrics if state else {}
 
+            now = datetime.now(timezone.utc)
             uptime = "—"
+            running_since = "—"
             if state and state.session_started and info.status == "RUNNING":
-                delta = datetime.now(timezone.utc) - state.session_started
-                hours = int(delta.total_seconds() / 3600)
+                delta = now - state.session_started
+                days = int(delta.total_seconds() / 86400)
+                hours = int((delta.total_seconds() % 86400) / 3600)
                 minutes = int((delta.total_seconds() % 3600) / 60)
-                if hours > 0:
+                if days > 0:
+                    uptime = f"{days}d {hours}h"
+                elif hours > 0:
                     uptime = f"{hours}h {minutes}m"
                 else:
                     uptime = f"{minutes}m"
+                running_since = state.session_started.strftime("%b %d, %I:%M %p")
+
+            mentions = " ".join(resolved.notify_users) if resolved.notify_users else ""
 
             return {
                 "name": resolved.name,
@@ -96,6 +104,8 @@ def _handle_status(config: Config, state_backend: StateBackend) -> dict:
                 "ip": info.external_ip,
                 "gpu_type": resolved.gpu_type,
                 "uptime": uptime,
+                "running_since": running_since,
+                "notify_users": mentions,
             }
         except Exception as e:
             return {"name": resolved.name, "running": False, "error": str(e)[:100], "gpu_type": vm_cfg.gpu_type}

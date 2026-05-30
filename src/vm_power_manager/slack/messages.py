@@ -235,7 +235,7 @@ class MessageBuilder:
 
     @staticmethod
     def status_response(vm_statuses: list[dict]) -> dict:
-        """Status overview of all VMs — GPU VMs shown with full detail, others compact."""
+        """Status overview of all VMs — detailed multi-line format."""
         gpu_vms = [v for v in vm_statuses if v.get("gpu_type")]
         other_vms = [v for v in vm_statuses if not v.get("gpu_type")]
 
@@ -253,17 +253,17 @@ class MessageBuilder:
                 "elements": [{"type": "mrkdwn", "text": ":zap: *GPU VMs*"}],
             })
             for vm in gpu_vms:
-                blocks.append(_build_gpu_vm_status_block(vm))
+                blocks.extend(_build_status_vm_block(vm, is_gpu=True))
+                blocks.append({"type": "divider"})
 
         if other_vms:
-            if gpu_vms:
-                blocks.append({"type": "divider"})
             blocks.append({
                 "type": "context",
                 "elements": [{"type": "mrkdwn", "text": ":desktop_computer: *Standard VMs*"}],
             })
             for vm in other_vms:
-                blocks.append(_build_standard_vm_status_block(vm))
+                blocks.extend(_build_status_vm_block(vm, is_gpu=False))
+                blocks.append({"type": "divider"})
 
         if not vm_statuses:
             blocks.append({
@@ -271,7 +271,6 @@ class MessageBuilder:
                 "text": {"type": "mrkdwn", "text": "_No VMs configured._"},
             })
 
-        blocks.append({"type": "divider"})
         blocks.append({
             "type": "context",
             "elements": [{"type": "mrkdwn", "text": f":clock1: Updated at <!date^{int(datetime.now(timezone.utc).timestamp())}^{{date_short_pretty}} {{time}}|just now>"}],
@@ -558,7 +557,7 @@ class MessageBuilder:
 
 
 def _build_gpu_vm_status_block(vm: dict) -> dict:
-    """Build a rich status block for a GPU-enabled VM (used in /vm status)."""
+    """Build a rich status block for a GPU-enabled VM (legacy, kept for compatibility)."""
     status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
     status_text = "Running" if vm.get("running") else "Stopped"
     error = vm.get("error")
@@ -592,7 +591,7 @@ def _build_gpu_vm_status_block(vm: dict) -> dict:
 
 
 def _build_standard_vm_status_block(vm: dict) -> dict:
-    """Build a compact status block for a non-GPU VM (used in /vm status)."""
+    """Build a compact status block for a non-GPU VM (legacy, kept for compatibility)."""
     status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
     status_text = "Running" if vm.get("running") else "Stopped"
     error = vm.get("error")
@@ -612,6 +611,53 @@ def _build_standard_vm_status_block(vm: dict) -> dict:
         "type": "section",
         "text": {"type": "mrkdwn", "text": f"{status_emoji}  *{vm['name']}*  — _{status_text}_\n{detail}"},
     }
+
+
+def _build_status_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
+    """Build a detailed multi-line status block for /vm status command (includes IP)."""
+    status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
+    status_text = "Running" if vm.get("running") else "Stopped"
+    error = vm.get("error")
+
+    if error:
+        return [{"type": "section", "text": {"type": "mrkdwn", "text": f"{status_emoji}  *{vm['name']}*\n_Error: {error[:80]}_"}}]
+
+    running_since = vm.get("running_since", "—")
+    uptime = vm.get("uptime", "—")
+    procs = vm.get("processes", 0)
+    ip = vm.get("ip") or "—"
+
+    if vm.get("running") and running_since != "—":
+        status_line = f"*Status:*           {status_text}\n*Running Since:* {running_since}  _({uptime})_"
+    elif vm.get("running"):
+        status_line = f"*Status:*           {status_text}\n*Uptime:*          {uptime}"
+    else:
+        status_line = f"*Status:*           {status_text}"
+
+    lines = [f"{status_emoji}  *{vm['name']}*\n\n{status_line}\n"]
+
+    if is_gpu:
+        gpu_type = vm.get("gpu_type", "—")
+        gpu = _fmt_pct(vm.get("gpu"))
+        gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
+        lines.append(f"*GPU Model:*      `{gpu_type}`")
+        lines.append(f"*GPU Util:*         `{gpu}`")
+        lines.append(f"*GPU Memory:*   `{gpu_mem}`")
+        lines.append("")
+
+    cpu = _fmt_pct(vm.get("cpu"))
+    cores = vm.get("cpu_cores")
+    cpu_str = f"{cpu}  ({cores} cores)" if cores else cpu
+    mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+    disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
+
+    lines.append(f"*CPU:*               `{cpu_str}`")
+    lines.append(f"*RAM:*              `{mem}`")
+    lines.append(f"*Disk:*              `{disk}`")
+    lines.append(f"*Processes:*      `{procs} active`")
+    lines.append(f"*IP:*                 `{ip}`")
+
+    return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
 
 
 def _build_detailed_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:

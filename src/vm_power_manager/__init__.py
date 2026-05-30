@@ -2,5 +2,5 @@
 
 from vm_power_manager.api import check_idle, handle_slack, send_daily_digest, send_gpu_status_report
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 __all__ = ["check_idle", "handle_slack", "send_daily_digest", "send_gpu_status_report"]
