@@ -127,7 +127,7 @@ vm-power-manager/
 ├── .gitignore
 │
 ├── src/vm_power_manager/            ← the library
-│   ├── __init__.py                  ← public API: check_idle(), handle_slack()
+│   ├── __init__.py                  ← public API: check_idle(), handle_slack(), send_daily_digest(), send_gpu_status_report()
 │   ├── api.py                       ← entry points called by wrappers
 │   ├── config.py                    ← YAML loader + 3-layer merge
 │   ├── bundled_defaults.yaml        ← ships with package (safe defaults)
@@ -252,11 +252,11 @@ Full reference: [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md).
 | Lifecycle hooks | Pre-stop/post-start commands, auto-upgrade prevention | stable |
 | Extend/Pause | `/vm extend <name> 30`, `/vm pause <name>` | stable |
 | **GPU availability protection** | Pre-stop warning, multi-zone retry, auto-migrate on start | stable |
-| **GPU continuous-running alerts** | Configurable interval alerts for GPU VMs running too long | stable |
-| **Daily digest** | Comprehensive VM summary (uptime, GPU/CPU/mem/disk, processes) | stable |
+| **GPU status report (12h)** | Consolidated report of all running GPU VMs at 9 PM (configurable) | stable |
+| **Daily VM report (all VMs)** | Full VM summary at 9 AM — uptime, GPU/CPU/RAM/disk, processes | stable |
+| **Exact metric values** | Shows total/used (e.g., "48.9% (79.5/162.8 GB)") not just percentages | stable |
 | **Command attribution** | Everyone sees who ran `/vm status/start/stop` in channel | stable |
 | Metric fallback | Falls back to SSH if Monitoring API returns no data | stable |
-| Disk metrics | Root partition usage via SSH (`df`) or Monitoring API | stable |
 | Multiple state backends | GCS, Firestore, S3, DynamoDB, Redis, File | stable |
 
 ---

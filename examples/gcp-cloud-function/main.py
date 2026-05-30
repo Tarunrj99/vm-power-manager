@@ -4,7 +4,7 @@ import os
 
 import functions_framework
 
-from vm_power_manager import check_idle, handle_slack, send_daily_digest
+from vm_power_manager import check_idle, handle_slack, send_daily_digest, send_gpu_status_report
 
 CONFIG = os.path.join(os.path.dirname(__file__), "config.yaml")
 
@@ -23,5 +23,11 @@ def slack(request):
 
 @functions_framework.cloud_event
 def daily_digest(cloud_event):
-    """Cloud Scheduler triggers this once per day (e.g. 09:00 UTC)."""
+    """Cloud Scheduler triggers this once per day (e.g. 9 AM IST / 3:30 AM UTC)."""
     return send_daily_digest(config=CONFIG)
+
+
+@functions_framework.cloud_event
+def gpu_status(cloud_event):
+    """Cloud Scheduler triggers 12h after daily digest (e.g. 9 PM IST / 3:30 PM UTC)."""
+    return send_gpu_status_report(config=CONFIG)
