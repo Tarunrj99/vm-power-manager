@@ -5,9 +5,38 @@ Auto-stops idle VMs based on configurable metrics, sends Slack warnings before s
 
 _One library. Any cloud. One config file per deployment._
 
-![python](https://img.shields.io/badge/python-3.11+-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![platform](https://img.shields.io/badge/platform-GCP%20%7C%20AWS%20%7C%20Azure%20%7C%20SSH-lightgrey) ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+![python](https://img.shields.io/badge/python-3.11+-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![platform](https://img.shields.io/badge/platform-GCP%20%7C%20AWS%20%7C%20Azure%20%7C%20SSH-lightgrey) ![CI](https://github.com/Tarunrj99/vm-power-manager/actions/workflows/security.yml/badge.svg) ![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 [Quick start](#quick-start--5-minutes) · [Config](#configuration-model) · [Features](#feature-catalog) · [Architecture](#architecture-at-a-glance) · [Deployment](#deployment-recipes) · [Local dev](#local-development) · [Docs](#docs-index)
+
+---
+
+## What does it look like?
+
+> See the full gallery of every Slack notification type in [docs/SLACK_OUTPUTS.md](docs/SLACK_OUTPUTS.md)
+
+**`/vm status`** — instant overview of all your VMs:
+```
+🟢 ml-training-gpu-01
+
+  GPU Model: nvidia-tesla-t4
+  GPU Util:  72.3%
+  GPU Memory: 9.8/15.0 GB
+  CPU: 34.2% (4 cores)
+  RAM: 48.9% (79.5/162.8 GB)
+  Disk: 77.0% (155/200 GB)
+  Processes: 3 active
+```
+
+**Idle warning** — users get notified before auto-stop with interactive buttons:
+```
+⚠️ VM Shutting Down in 10 min
+
+  GPU: 0%  |  CPU: 1%  |  RAM: 12%
+  Processes: 0  |  Sessions: 0
+
+  [ Keep Running ]  [ Stop Now ]
+```
 
 ---
 
@@ -28,24 +57,27 @@ This repo is the opposite:
 
 Adding a new VM = one entry in `config.yaml`. Changing thresholds = one line edit. No rewriting code.
 
+> **💰 Real-world impact:** A single idle T4 GPU VM costs ~$260/month. An idle A100 costs ~$2,900/month. This tool pays for itself on day one.
+
 ---
 
 ## Table of contents
 
-1. [Requirements](#requirements)
-2. [Architecture at a glance](#architecture-at-a-glance)
-3. [Repository layout](#repository-layout)
-4. [Quick start — 5 minutes](#quick-start--5-minutes)
-5. [Configuration model](#configuration-model)
-6. [Feature catalog](#feature-catalog)
-7. [Deployment recipes](#deployment-recipes)
-8. [Local development](#local-development)
-9. [Debugging](#debugging)
-10. [Extending](#extending)
-11. [Docs index](#docs-index)
-12. [Contributing](#contributing)
-13. [Security](#security)
-14. [License](#license)
+1. [What does it look like?](#what-does-it-look-like)
+2. [Requirements](#requirements)
+3. [Architecture at a glance](#architecture-at-a-glance)
+4. [Repository layout](#repository-layout)
+5. [Quick start — 5 minutes](#quick-start--5-minutes)
+6. [Configuration model](#configuration-model)
+7. [Feature catalog](#feature-catalog)
+8. [Deployment recipes](#deployment-recipes)
+9. [Local development](#local-development)
+10. [Debugging](#debugging)
+11. [Extending](#extending)
+12. [Docs index](#docs-index)
+13. [Contributing](#contributing)
+14. [Security](#security)
+15. [License](#license)
 
 ---
 
@@ -173,6 +205,8 @@ vm-power-manager/
 │   └── gpu-reservation-setup.sh    ← create GCP GPU reservations
 │
 ├── docs/                            ← deeper docs
+│   ├── SLACK_OUTPUTS.md             ← example Slack messages (all types)
+│   ├── METRICS_SETUP.md             ← metric collection + VM-side prerequisites
 │   ├── CONFIG_REFERENCE.md
 │   ├── SETUP_GUIDE.md
 │   └── GPU_AVAILABILITY.md         ← GPU unavailability guide
