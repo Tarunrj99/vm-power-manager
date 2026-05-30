@@ -356,9 +356,65 @@ No firewall changes needed if same VPC.
 
 ### "—" for GPU metrics
 
-1. **Check NVIDIA drivers**: `nvidia-smi` must work on the VM
-2. **For Ops Agent**: Ensure `nvml` receiver is configured
-3. **For SSH**: Verify the SSH user can run `nvidia-smi`
+If GPU metrics show "—" in Slack, the system cannot read GPU data. This requires `nvidia-smi` to be functional on the VM.
+
+**Prerequisites for GPU metrics:**
+
+1. **NVIDIA drivers must be installed** on the VM
+2. **The nvidia kernel module must be loaded** (`lsmod | grep nvidia`)
+3. **`nvidia-smi` must return data** when run by the SSH user
+
+**Common issue: Driver installed but kernel module not loaded**
+
+After a kernel update, the NVIDIA kernel module may fail to load. Symptoms:
+- `nvidia-smi` says "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver"
+- `lsmod | grep nvidia` returns nothing
+- `lspci | grep -i nvidia` shows the GPU hardware exists
+
+**Fix:**
+
+```bash
+# Load the module manually
+sudo modprobe nvidia
+
+# Verify it works
+nvidia-smi
+
+# Make it load on every boot
+echo 'nvidia' | sudo tee /etc/modules-load.d/nvidia.conf
+```
+
+**If `modprobe nvidia` fails with "Module not found":**
+
+```bash
+# Install kernel headers for your current kernel
+sudo apt-get install linux-headers-$(uname -r)
+
+# Rebuild DKMS module
+sudo dkms install nvidia/$(dkms status | grep nvidia | head -1 | awk -F',' '{print $1}' | awk -F'/' '{print $2}')
+
+# Then load and persist
+sudo modprobe nvidia
+echo 'nvidia' | sudo tee /etc/modules-load.d/nvidia.conf
+```
+
+**If no NVIDIA packages are installed at all:**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install nvidia-driver-535 nvidia-utils-535
+
+# Then load and persist
+sudo modprobe nvidia
+echo 'nvidia' | sudo tee /etc/modules-load.d/nvidia.conf
+```
+
+**Verify everything works:**
+```bash
+nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,name --format=csv,noheader
+# Should output something like: 0 %, 2 MiB, 15360 MiB, Tesla T4
+```
 
 ### "—" for Memory/Disk
 
