@@ -28,6 +28,17 @@ state:
   bucket: "YOUR-STATE-BUCKET-NAME"
   prefix: "state/"
 
+# --- Report Schedules ---
+# Configure when automated reports are sent.
+# Times in deploy.sh cron format; these are config-layer documentation.
+# Actual scheduling is done via Cloud Scheduler (see deploy.sh).
+schedule:
+  daily_report_time: "03:30"         # UTC time (e.g., 03:30 UTC = 9:00 AM IST)
+  daily_report_timezone: "UTC"       # IANA timezone
+  gpu_report_time: "15:30"           # UTC time (e.g., 15:30 UTC = 9:00 PM IST)
+  gpu_report_timezone: "UTC"         # IANA timezone
+  gpu_report_enabled: true           # Set false to disable GPU status reports
+
 # Override defaults per-deployment (optional)
 # defaults:
 #   idle_threshold_below: 5

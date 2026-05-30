@@ -98,6 +98,16 @@ class NotificationConfig(BaseModel):
     daily_summary_time: str = "09:00"
 
 
+class ScheduleConfig(BaseModel):
+    """Configurable schedules for automated reports."""
+
+    daily_report_time: str = "03:30"
+    daily_report_timezone: str = "UTC"
+    gpu_report_time: str = "15:30"
+    gpu_report_timezone: str = "UTC"
+    gpu_report_enabled: bool = True
+
+
 class VMDefaults(BaseModel):
     idle_metric: IdleMetric = IdleMetric.GPU_UTILIZATION
     idle_threshold_below: float = 5.0
@@ -300,6 +310,7 @@ class Config(BaseModel):
     slack: SlackConfig = Field(default_factory=SlackConfig)
     defaults: VMDefaults = Field(default_factory=VMDefaults)
     state: StateConfig = Field(default_factory=StateConfig)
+    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
     vms: list[VMConfig] = Field(default_factory=list)
 
 
