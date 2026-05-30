@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] — 2026-05-31
+
+### Added
+
+- **Fully configurable reports**: New `reports` config section replaces `schedule`
+  - `reports.daily.title` / `reports.gpu.title` — custom report names
+  - `reports.daily.message` / `reports.gpu.message` — custom header messages
+  - `reports.daily.display` / `reports.gpu.display` — toggle each metric on/off
+  - `reports.daily.schedules` / `reports.gpu.schedules` — multiple cron expressions
+  - `reports.daily.enabled` / `reports.gpu.enabled` — disable reports entirely
+- **Metric display toggles**: `show_gpu_model`, `show_gpu_utilization`, `show_gpu_memory`, `show_cpu`, `show_ram`, `show_disk`, `show_processes`, `show_uptime`, `show_ip`
+- Users can build fully custom report templates from config alone — no code changes
+
+### Changed
+
+- Replaced `schedule` config section with `reports` (backward-compatible defaults)
+- `daily_summary()` and `gpu_status_report()` accept `ReportConfig` parameter
+- Deploy scripts read schedules from `reports.daily.schedules` / `reports.gpu.schedules`
+
 ## [1.4.0] — 2026-05-31
 
 ### Added

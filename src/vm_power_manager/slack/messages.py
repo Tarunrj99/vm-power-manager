@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from vm_power_manager.models import MetricSnapshot, ResolvedVMConfig, VMState
+from vm_power_manager.models import MetricSnapshot, ReportConfig, ReportDisplayConfig, ResolvedVMConfig, VMState
 
 
 class MessageBuilder:
@@ -279,28 +279,29 @@ class MessageBuilder:
         return {"blocks": blocks}
 
     @staticmethod
-    def daily_summary(vm_summaries: list[dict]) -> dict:
+    def daily_summary(vm_summaries: list[dict], report_config: ReportConfig | None = None) -> dict:
         """Daily full report — all VMs with detailed metrics, clean format."""
         now = datetime.now(timezone.utc)
+        cfg = report_config or ReportConfig(
+            title="Daily VM Report",
+            message="Daily overview of all managed VMs. If you're using a VM listed here, please review and stop it if not actively in use \u2014 to save costs.",
+        )
+        display = cfg.display
+
         blocks = [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": ":bar_chart:  Daily VM Report"},
-            },
-            {"type": "divider"},
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": (
-                        ":speech_balloon: _Daily overview of all managed VMs. "
-                        "If you're using a VM listed here, please review and stop it "
-                        "if not actively in use — to save costs._"
-                    ),
-                },
+                "text": {"type": "plain_text", "text": f":bar_chart:  {cfg.title}"},
             },
             {"type": "divider"},
         ]
+
+        if cfg.message:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f":speech_balloon: _{cfg.message}_"},
+            })
+            blocks.append({"type": "divider"})
 
         gpu_vms = [v for v in vm_summaries if v.get("gpu_type")]
         other_vms = [v for v in vm_summaries if not v.get("gpu_type")]
@@ -311,7 +312,7 @@ class MessageBuilder:
                 "elements": [{"type": "mrkdwn", "text": ":zap: *GPU VMs*"}],
             })
             for vm in gpu_vms:
-                blocks.extend(_build_detailed_vm_block(vm, is_gpu=True))
+                blocks.extend(_build_detailed_vm_block(vm, is_gpu=True, display=display))
                 blocks.append({"type": "divider"})
 
         if other_vms:
@@ -320,7 +321,7 @@ class MessageBuilder:
                 "elements": [{"type": "mrkdwn", "text": ":desktop_computer: *Standard VMs*"}],
             })
             for vm in other_vms:
-                blocks.extend(_build_detailed_vm_block(vm, is_gpu=False))
+                blocks.extend(_build_detailed_vm_block(vm, is_gpu=False, display=display))
                 blocks.append({"type": "divider"})
 
         if not vm_summaries:
@@ -331,7 +332,6 @@ class MessageBuilder:
             "elements": [
                 {"type": "mrkdwn", "text": (
                     f":calendar: <!date^{int(now.timestamp())}^{{date_long_pretty}} {{time}}|{now.strftime('%b %d, %Y')}>\n"
-                    ":next_track_button: GPU status check in 12 hours\n"
                     ":bulb: `/vm status` for real-time metrics"
                 )},
             ],
@@ -340,31 +340,32 @@ class MessageBuilder:
         return {"blocks": blocks}
 
     @staticmethod
-    def gpu_status_report(gpu_vm_data: list[dict]) -> dict:
-        """Consolidated GPU VMs status report — sent every 12h, only running GPU VMs."""
+    def gpu_status_report(gpu_vm_data: list[dict], report_config: ReportConfig | None = None) -> dict:
+        """Consolidated GPU VMs status report — only running GPU VMs."""
         now = datetime.now(timezone.utc)
+        cfg = report_config or ReportConfig(
+            title="GPU VMs Status",
+            message="This is a periodic reminder. GPU VMs are expensive when idle. If you are not using this VM, please stop it. Ignore if actively working.",
+        )
+        display = cfg.display
+
         blocks = [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": ":bell:  GPU VMs Status"},
-            },
-            {"type": "divider"},
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": (
-                        ":speech_balloon: _This is a periodic reminder. GPU VMs are expensive "
-                        "when idle. If you are not using this VM, please stop it. "
-                        "Ignore if actively working._"
-                    ),
-                },
+                "text": {"type": "plain_text", "text": f":bell:  {cfg.title}"},
             },
             {"type": "divider"},
         ]
 
+        if cfg.message:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f":speech_balloon: _{cfg.message}_"},
+            })
+            blocks.append({"type": "divider"})
+
         for vm in gpu_vm_data:
-            blocks.extend(_build_detailed_vm_block(vm, is_gpu=True))
+            blocks.extend(_build_detailed_vm_block(vm, is_gpu=True, display=display))
             blocks.append({"type": "divider"})
 
         if not gpu_vm_data:
@@ -375,7 +376,6 @@ class MessageBuilder:
             "elements": [
                 {"type": "mrkdwn", "text": (
                     f":calendar: <!date^{int(now.timestamp())}^{{date_long_pretty}} {{time}}|{now.strftime('%b %d, %Y')}>\n"
-                    ":next_track_button: Full daily report in 12 hours\n"
                     ":bulb: `/vm status` for real-time metrics"
                 )},
             ],
@@ -660,8 +660,9 @@ def _build_status_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
     return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
 
 
-def _build_detailed_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
+def _build_detailed_vm_block(vm: dict, is_gpu: bool = True, display: ReportDisplayConfig | None = None) -> list[dict]:
     """Build a detailed multi-line block for a VM (used in daily digest and GPU status report)."""
+    d = display or ReportDisplayConfig()
     status_emoji = ":large_green_circle:" if vm.get("running") else ":red_circle:"
     status_text = "Running" if vm.get("running") else "Stopped"
     error = vm.get("error")
@@ -674,9 +675,9 @@ def _build_detailed_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
     procs = vm.get("processes", 0)
     mentions = vm.get("notify_users", "")
 
-    if vm.get("running") and running_since != "—":
+    if d.show_uptime and vm.get("running") and running_since != "—":
         status_line = f"*Status:*        {status_text}\n*Running Since:*  {running_since}  _({uptime})_"
-    elif vm.get("running"):
+    elif d.show_uptime and vm.get("running"):
         status_line = f"*Status:*        {status_text}\n*Uptime:*         {uptime}"
     else:
         status_line = f"*Status:*        {status_text}"
@@ -684,24 +685,34 @@ def _build_detailed_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
     lines = [f"{status_emoji}  *{vm['name']}*\n\n{status_line}\n"]
 
     if is_gpu:
-        gpu_type = vm.get("gpu_type", "—")
-        gpu = _fmt_pct(vm.get("gpu"))
-        gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
-        lines.append(f"*GPU Model:*     `{gpu_type}`")
-        lines.append(f"*GPU Util:*        `{gpu}`")
-        lines.append(f"*GPU Memory:*  `{gpu_mem}`")
-        lines.append("")
+        if d.show_gpu_model:
+            gpu_type = vm.get("gpu_type", "—")
+            lines.append(f"*GPU Model:*     `{gpu_type}`")
+        if d.show_gpu_utilization:
+            gpu = _fmt_pct(vm.get("gpu"))
+            lines.append(f"*GPU Util:*        `{gpu}`")
+        if d.show_gpu_memory:
+            gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
+            lines.append(f"*GPU Memory:*  `{gpu_mem}`")
+        if d.show_gpu_model or d.show_gpu_utilization or d.show_gpu_memory:
+            lines.append("")
 
-    cpu = _fmt_pct(vm.get("cpu"))
-    cores = vm.get("cpu_cores")
-    cpu_str = f"{cpu}  ({cores} cores)" if cores else cpu
-    mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
-    disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
-
-    lines.append(f"*CPU:*              `{cpu_str}`")
-    lines.append(f"*RAM:*             `{mem}`")
-    lines.append(f"*Disk:*             `{disk}`")
-    lines.append(f"*Processes:*     `{procs} active`")
+    if d.show_cpu:
+        cpu = _fmt_pct(vm.get("cpu"))
+        cores = vm.get("cpu_cores")
+        cpu_str = f"{cpu}  ({cores} cores)" if cores else cpu
+        lines.append(f"*CPU:*              `{cpu_str}`")
+    if d.show_ram:
+        mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
+        lines.append(f"*RAM:*             `{mem}`")
+    if d.show_disk:
+        disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
+        lines.append(f"*Disk:*             `{disk}`")
+    if d.show_processes:
+        lines.append(f"*Processes:*     `{procs} active`")
+    if d.show_ip:
+        ip = vm.get("ip") or "—"
+        lines.append(f"*IP:*                 `{ip}`")
 
     blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}},

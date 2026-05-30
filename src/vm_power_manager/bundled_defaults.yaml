@@ -144,11 +144,39 @@ defaults:
 state:
   backend: "gcs_bucket"
 
-schedule:
-  daily_report_schedules:
-    - "30 3 * * *"
-  daily_report_timezone: "UTC"
-  gpu_report_schedules:
-    - "30 15 * * *"
-  gpu_report_timezone: "UTC"
-  gpu_report_enabled: true
+reports:
+  daily:
+    title: "Daily VM Report"
+    message: "Daily overview of all managed VMs. If you're using a VM listed here, please review and stop it if not actively in use — to save costs."
+    display:
+      show_gpu_model: true
+      show_gpu_utilization: true
+      show_gpu_memory: true
+      show_cpu: true
+      show_ram: true
+      show_disk: true
+      show_processes: true
+      show_uptime: true
+      show_ip: false
+    schedules:
+      - "30 3 * * *"
+    timezone: "UTC"
+    enabled: true
+
+  gpu:
+    title: "GPU VMs Status"
+    message: "This is a periodic reminder. GPU VMs are expensive when idle. If you are not using this VM, please stop it. Ignore if actively working."
+    display:
+      show_gpu_model: true
+      show_gpu_utilization: true
+      show_gpu_memory: true
+      show_cpu: true
+      show_ram: true
+      show_disk: true
+      show_processes: true
+      show_uptime: true
+      show_ip: false
+    schedules:
+      - "30 15 * * *"
+    timezone: "UTC"
+    enabled: true

@@ -370,7 +370,7 @@ def send_daily_digest(config: str | Path | Config) -> dict:
                 vm = futures[future]
                 summaries.append({"name": vm.name, "running": False, "gpu_type": vm.gpu_type})
 
-    msg = MessageBuilder.daily_summary(summaries)
+    msg = MessageBuilder.daily_summary(summaries, report_config=config.reports.daily)
 
     try:
         token = get_slack_token(config)
@@ -384,12 +384,12 @@ def send_daily_digest(config: str | Path | Config) -> dict:
 
 
 def send_gpu_status_report(config: str | Path | Config) -> dict:
-    """Send a consolidated GPU VMs status report — only running GPU VMs.
-
-    Designed to be called 12 hours after the daily digest (e.g., 9 PM if daily is 9 AM).
-    """
+    """Send a consolidated GPU VMs status report — only running GPU VMs."""
     if isinstance(config, (str, Path)):
         config = load_config(config)
+
+    if not config.reports.gpu.enabled:
+        return {"status": "skipped", "reason": "gpu_report_disabled"}
 
     manifest_result = _check_manifest_gate(config)
     if manifest_result is not None:
@@ -470,7 +470,7 @@ def send_gpu_status_report(config: str | Path | Config) -> dict:
     if not gpu_summaries:
         return {"status": "skipped", "reason": "no_running_gpu_vms"}
 
-    msg = MessageBuilder.gpu_status_report(gpu_summaries)
+    msg = MessageBuilder.gpu_status_report(gpu_summaries, report_config=config.reports.gpu)
 
     try:
         token = get_slack_token(config)

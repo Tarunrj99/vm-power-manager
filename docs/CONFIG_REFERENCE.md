@@ -156,62 +156,110 @@ If the primary source returns `None`, the system falls back to SSH automatically
 
 Plus all `defaults.*` keys can be overridden per VM.
 
-### schedule
+### reports
 
-Controls when automated reports are sent. Each report type accepts a **list** of cron expressions — one Cloud Scheduler job is created per expression.
+Controls report titles, messages, visible metrics, and schedules. Fully configurable per report type.
+
+#### reports.daily / reports.gpu
+
+Both `daily` and `gpu` accept the same structure:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `daily_report_schedules` | list[string] | `["30 3 * * *"]` | Cron expressions for daily full report |
-| `daily_report_timezone` | string | `UTC` | IANA timezone for daily report |
-| `gpu_report_schedules` | list[string] | `["30 15 * * *"]` | Cron expressions for GPU status report |
-| `gpu_report_timezone` | string | `UTC` | IANA timezone for GPU report |
-| `gpu_report_enabled` | bool | `true` | Set `false` to disable GPU reports entirely |
+| `title` | string | `"Daily VM Report"` / `"GPU VMs Status"` | Custom report title shown in Slack header |
+| `message` | string | (see defaults) | Note displayed at the top of each report. Set `""` to hide |
+| `display` | object | (all true except IP) | Which metrics to show — see table below |
+| `schedules` | list[string] | `["30 3 * * *"]` / `["30 15 * * *"]` | Cron expressions (multiple = multiple triggers) |
+| `timezone` | string | `UTC` | IANA timezone for schedules |
+| `enabled` | bool | `true` | Set `false` to disable this report entirely |
 
-#### Schedule Examples
+#### reports.daily.display / reports.gpu.display
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `show_gpu_model` | bool | `true` | Show GPU model name (e.g., nvidia-a100-80gb) |
+| `show_gpu_utilization` | bool | `true` | Show GPU utilization percentage |
+| `show_gpu_memory` | bool | `true` | Show GPU VRAM (used/total) |
+| `show_cpu` | bool | `true` | Show CPU percentage and core count |
+| `show_ram` | bool | `true` | Show RAM percentage and used/total |
+| `show_disk` | bool | `true` | Show disk percentage and used/total |
+| `show_processes` | bool | `true` | Show active process count |
+| `show_uptime` | bool | `true` | Show running since / uptime duration |
+| `show_ip` | bool | `false` | Show external IP address |
+
+#### Examples
 
 ```yaml
-# Once daily at 9 AM IST (3:30 UTC)
-schedule:
-  daily_report_schedules:
-    - "30 3 * * *"
-  gpu_report_schedules:
-    - "30 15 * * *"
+# Custom titles and messages
+reports:
+  daily:
+    title: "Morning Infrastructure Check"
+    message: "Please review your VMs and shut down anything not in use."
+  gpu:
+    title: "GPU Cost Alert"
+    message: "These GPU VMs have been running. Stop them if idle."
+
+# Hide certain metrics in GPU report
+reports:
+  gpu:
+    display:
+      show_disk: false
+      show_processes: false
 
 # GPU report every 2 hours
-schedule:
-  gpu_report_schedules:
-    - "0 */2 * * *"
+reports:
+  gpu:
+    schedules:
+      - "0 */2 * * *"
 
-# GPU report every 6 hours
-schedule:
-  gpu_report_schedules:
-    - "0 */6 * * *"
+# GPU report at specific times (10:00, 14:30, 21:14)
+reports:
+  gpu:
+    schedules:
+      - "0 10 * * *"
+      - "30 14 * * *"
+      - "14 21 * * *"
 
-# GPU report at specific times (10:00, 14:30, 21:14 UTC)
-schedule:
-  gpu_report_schedules:
-    - "0 10 * * *"
-    - "30 14 * * *"
-    - "14 21 * * *"
+# GPU report 3 times daily using IST timezone
+reports:
+  gpu:
+    schedules:
+      - "0 9 * * *"
+      - "0 15 * * *"
+      - "0 21 * * *"
+    timezone: "Asia/Kolkata"
 
-# GPU report 3 times daily at 9 AM, 3 PM, 9 PM (IST timezone)
-schedule:
-  gpu_report_schedules:
-    - "0 9 * * *"
-    - "0 15 * * *"
-    - "0 21 * * *"
-  gpu_report_timezone: "Asia/Kolkata"
+# Weekdays only, with IP shown
+reports:
+  daily:
+    schedules:
+      - "0 9 * * 1-5"
+    display:
+      show_ip: true
+  gpu:
+    schedules:
+      - "0 18 * * 1-5"
 
-# Weekdays only
-schedule:
-  daily_report_schedules:
-    - "0 9 * * 1-5"
-  gpu_report_schedules:
-    - "0 18 * * 1-5"
+# Minimal GPU report — only GPU metrics and uptime
+reports:
+  gpu:
+    title: "GPU Check"
+    message: ""
+    display:
+      show_gpu_model: true
+      show_gpu_utilization: true
+      show_gpu_memory: true
+      show_cpu: false
+      show_ram: false
+      show_disk: false
+      show_processes: false
+      show_uptime: true
+      show_ip: false
+    schedules:
+      - "*/30 * * * *"
 
-# Every 30 minutes (aggressive monitoring)
-schedule:
-  gpu_report_schedules:
-    - "*/30 * * * *"
+# Disable GPU reports entirely
+reports:
+  gpu:
+    enabled: false
 ```

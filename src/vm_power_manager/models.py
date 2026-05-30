@@ -98,22 +98,46 @@ class NotificationConfig(BaseModel):
     daily_summary_time: str = "09:00"
 
 
-class ScheduleConfig(BaseModel):
-    """Configurable schedules for automated reports.
+class ReportDisplayConfig(BaseModel):
+    """Toggle which metrics appear in report output."""
 
-    Each schedule is a list of cron expressions. Multiple entries = multiple triggers.
-    Examples:
-      - ["30 3 * * *"]              → once daily at 3:30 UTC
-      - ["0 */2 * * *"]            → every 2 hours
-      - ["0 */6 * * *"]            → every 6 hours
-      - ["0 10 * * *", "30 14 * * *", "14 21 * * *"]  → at 10:00, 14:30, 21:14
-    """
+    show_gpu_model: bool = True
+    show_gpu_utilization: bool = True
+    show_gpu_memory: bool = True
+    show_cpu: bool = True
+    show_ram: bool = True
+    show_disk: bool = True
+    show_processes: bool = True
+    show_uptime: bool = True
+    show_ip: bool = False
 
-    daily_report_schedules: list[str] = Field(default_factory=lambda: ["30 3 * * *"])
-    daily_report_timezone: str = "UTC"
-    gpu_report_schedules: list[str] = Field(default_factory=lambda: ["30 15 * * *"])
-    gpu_report_timezone: str = "UTC"
-    gpu_report_enabled: bool = True
+
+class ReportConfig(BaseModel):
+    """Configuration for a single report type (daily or GPU)."""
+
+    title: str = "Report"
+    message: str = ""
+    display: ReportDisplayConfig = Field(default_factory=ReportDisplayConfig)
+    schedules: list[str] = Field(default_factory=lambda: ["30 3 * * *"])
+    timezone: str = "UTC"
+    enabled: bool = True
+
+
+class ReportsConfig(BaseModel):
+    """Top-level reports configuration."""
+
+    daily: ReportConfig = Field(default_factory=lambda: ReportConfig(
+        title="Daily VM Report",
+        message="Daily overview of all managed VMs. If you're using a VM listed here, please review and stop it if not actively in use \u2014 to save costs.",
+        display=ReportDisplayConfig(show_ip=False),
+        schedules=["30 3 * * *"],
+    ))
+    gpu: ReportConfig = Field(default_factory=lambda: ReportConfig(
+        title="GPU VMs Status",
+        message="This is a periodic reminder. GPU VMs are expensive when idle. If you are not using this VM, please stop it. Ignore if actively working.",
+        display=ReportDisplayConfig(show_ip=False),
+        schedules=["30 15 * * *"],
+    ))
 
 
 class VMDefaults(BaseModel):
@@ -318,7 +342,7 @@ class Config(BaseModel):
     slack: SlackConfig = Field(default_factory=SlackConfig)
     defaults: VMDefaults = Field(default_factory=VMDefaults)
     state: StateConfig = Field(default_factory=StateConfig)
-    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
+    reports: ReportsConfig = Field(default_factory=ReportsConfig)
     vms: list[VMConfig] = Field(default_factory=list)
 
 

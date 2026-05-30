@@ -28,33 +28,61 @@ state:
   bucket: "YOUR-STATE-BUCKET-NAME"
   prefix: "state/"
 
-# --- Report Schedules ---
-# Each report type accepts a LIST of cron expressions.
-# Multiple entries = multiple triggers per day. Uses standard cron syntax.
+# --- Reports Configuration ---
+# Fully customizable: titles, messages, which metrics to show, and schedules.
+# Each report type accepts a LIST of cron expressions for scheduling.
 #
 # Cron format: "minute hour day-of-month month day-of-week"
-#
 # Examples:
-#   Single time:       ["30 3 * * *"]                     → 3:30 AM UTC daily
-#   Every 2 hours:     ["0 */2 * * *"]                    → 00:00, 02:00, 04:00, ...
-#   Every 6 hours:     ["0 */6 * * *"]                    → 00:00, 06:00, 12:00, 18:00
-#   Every 30 minutes:  ["*/30 * * * *"]                   → :00 and :30 of every hour
+#   Single time:       ["30 3 * * *"]                                → 3:30 AM UTC daily
+#   Every 2 hours:     ["0 */2 * * *"]                               → 00:00, 02:00, 04:00, ...
+#   Every 6 hours:     ["0 */6 * * *"]                               → 00:00, 06:00, 12:00, 18:00
+#   Every 30 minutes:  ["*/30 * * * *"]                              → :00 and :30 of every hour
 #   Specific times:    ["0 10 * * *", "30 14 * * *", "14 21 * * *"]  → 10:00, 14:30, 21:14
-#   Weekdays only:     ["0 9 * * 1-5"]                    → 9 AM Mon-Fri
-#   Twice daily:       ["0 9 * * *", "0 21 * * *"]        → 9 AM and 9 PM
+#   Weekdays only:     ["0 9 * * 1-5"]                               → 9 AM Mon-Fri
+#   Twice daily:       ["0 9 * * *", "0 21 * * *"]                   → 9 AM and 9 PM
 #
-schedule:
-  # Full daily report (all VMs — running + stopped)
-  daily_report_schedules:
-    - "30 3 * * *"                  # 3:30 AM UTC = 9:00 AM IST
-  daily_report_timezone: "UTC"      # IANA timezone (UTC, America/New_York, Asia/Kolkata, etc.)
+reports:
+  # --- Daily Report (all VMs — running + stopped) ---
+  daily:
+    title: "Daily VM Report"            # change to any name you want
+    message: "Daily overview of all managed VMs. If you're using a VM listed here, please review and stop it if not actively in use — to save costs."
+    display:
+      show_gpu_model: true
+      show_gpu_utilization: true
+      show_gpu_memory: true
+      show_cpu: true
+      show_ram: true
+      show_disk: true
+      show_processes: true
+      show_uptime: true
+      show_ip: false                    # set true to include IP in daily report
+    schedules:
+      - "30 3 * * *"                    # 3:30 AM UTC (adjust to your timezone)
+    timezone: "UTC"                     # IANA timezone (UTC, America/New_York, Asia/Kolkata)
+    enabled: true
 
-  # GPU VMs status report (only running GPU VMs)
-  # Configure multiple times for more frequent monitoring of expensive GPU VMs
-  gpu_report_schedules:
-    - "30 15 * * *"                 # 3:30 PM UTC = 9:00 PM IST
-  gpu_report_timezone: "UTC"
-  gpu_report_enabled: true          # Set false to completely disable GPU reports
+  # --- GPU Report (only running GPU VMs) ---
+  gpu:
+    title: "GPU VMs Status"             # change to any name you want
+    message: "This is a periodic reminder. GPU VMs are expensive when idle. If you are not using this VM, please stop it. Ignore if actively working."
+    display:
+      show_gpu_model: true
+      show_gpu_utilization: true
+      show_gpu_memory: true
+      show_cpu: true
+      show_ram: true
+      show_disk: true
+      show_processes: true
+      show_uptime: true
+      show_ip: false
+    schedules:
+      - "30 15 * * *"                   # 3:30 PM UTC (adjust to your timezone)
+      # Add more for frequent monitoring:
+      # - "0 */2 * * *"                 # every 2 hours
+      # - "0 */6 * * *"                 # every 6 hours
+    timezone: "UTC"
+    enabled: true                       # set false to disable GPU reports entirely
 
 # Override defaults per-deployment (optional)
 # defaults:

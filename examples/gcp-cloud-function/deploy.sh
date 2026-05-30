@@ -21,8 +21,9 @@ STATE_BUCKET="${STATE_BUCKET:-${PROJECT_ID}-vm-power-state}"
 SCHEDULER_INTERVAL="${SCHEDULER_INTERVAL:-10}"
 
 # --- Schedule Configuration (configurable) ---
+# --- Schedule Configuration (configurable) ---
+# These override the schedules in config.yaml if set. Otherwise config.yaml values are used.
 # Supports MULTIPLE cron expressions — one Cloud Scheduler job per expression.
-# Format: space-separated cron expressions, each wrapped in quotes.
 #
 # Examples:
 #   Single daily:       DAILY_REPORT_SCHEDULES=("30 3 * * *")
@@ -45,8 +46,6 @@ BUILD_DIR="$SCRIPT_DIR/.build"
 echo "=== VM Power Manager Deployment ==="
 echo "Project:       $PROJECT_ID"
 echo "Region:        $REGION"
-echo "Daily report:  $DAILY_REPORT_CRON ($DAILY_REPORT_TZ)"
-echo "GPU report:    $GPU_REPORT_CRON ($GPU_REPORT_TZ)"
 echo ""
 
 # --- Build deployment package ---
