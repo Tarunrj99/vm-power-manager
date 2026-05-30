@@ -441,6 +441,112 @@ The system can't resolve the VM hostname. Either:
 
 ---
 
+## VM-Side Prerequisites Checklist
+
+Before VM Power Manager can monitor your VMs, ensure each VM meets these requirements:
+
+### Required for ALL VMs
+
+| Requirement | Why | How to verify |
+|-------------|-----|---------------|
+| **SSH access** (port 22 open) | Metric collection and process monitoring | `ssh -i KEY USER@IP "echo ok"` |
+| **SSH public key deployed** | Authentication for the monitoring service | `cat ~/.ssh/authorized_keys \| grep vm-power-manager` |
+| **Firewall allows port 22** | Network connectivity from Cloud Function | `gcloud compute firewall-rules list --filter="allowed:tcp:22"` |
+
+### Required for GPU VMs
+
+| Requirement | Why | How to verify |
+|-------------|-----|---------------|
+| **NVIDIA drivers installed** | GPU hardware access | `dpkg -l \| grep nvidia-driver` (Ubuntu) |
+| **nvidia kernel module loaded** | Driver must be active in kernel | `lsmod \| grep nvidia` |
+| **`nvidia-smi` functional** | Command used to read GPU metrics | `nvidia-smi` (should show GPU info) |
+| **Module auto-loads on boot** | Survives VM reboots and kernel updates | `cat /etc/modules-load.d/nvidia.conf` should contain `nvidia` |
+
+**GPU setup script (run once per GPU VM):**
+
+```bash
+#!/bin/bash
+# Verify GPU hardware exists
+lspci | grep -i nvidia || { echo "No NVIDIA GPU found"; exit 1; }
+
+# Check if nvidia-smi works
+if nvidia-smi &>/dev/null; then
+    echo "GPU already working"
+else
+    # Try loading the module
+    sudo modprobe nvidia 2>/dev/null
+    if nvidia-smi &>/dev/null; then
+        echo "Module loaded successfully"
+    else
+        # Install drivers (Ubuntu/Debian)
+        echo "Installing NVIDIA drivers..."
+        sudo apt-get update
+        sudo apt-get install -y linux-headers-$(uname -r) nvidia-driver-535 nvidia-utils-535
+        sudo modprobe nvidia
+    fi
+fi
+
+# Persist across reboots
+echo 'nvidia' | sudo tee /etc/modules-load.d/nvidia.conf
+
+# Verify
+nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total --format=csv,noheader
+```
+
+### Recommended for ALL VMs
+
+| Requirement | Why | How to configure |
+|-------------|-----|-----------------|
+| **Disable unattended-upgrades** | Prevents kernel updates that break GPU drivers and cause unexpected reboots during work | See below |
+| **Static external IP** (or known hostname) | SSH connectivity from Cloud Function | GCP: promote ephemeral IP to static |
+| **Network tag for firewall** | Fine-grained SSH access control | `gcloud compute instances add-tags VM --tags=vm-power-manager-ssh` |
+
+**Disable unattended-upgrades (Ubuntu/Debian):**
+
+```bash
+# Disable automatic upgrades that can break GPU drivers
+sudo systemctl stop unattended-upgrades
+sudo systemctl disable unattended-upgrades
+sudo apt-get remove -y unattended-upgrades
+
+# OR use the library's built-in pre-stop hook (configured in config.yaml):
+# defaults:
+#   pre_stop_commands:
+#     - "sudo systemctl stop unattended-upgrades"
+```
+
+> **Why this matters:** Unattended upgrades can install a new kernel without rebuilding the NVIDIA DKMS module, causing `nvidia-smi` to fail after reboot. The library can handle this with `disable_auto_upgrades: true` in config, but it's best to disable it at the VM level.
+
+### Network / Firewall Setup
+
+The monitoring service needs to reach your VMs on port 22. Depending on where you deploy:
+
+**GCP Cloud Functions → GCP VMs:**
+```bash
+# Create firewall rule allowing SSH from Cloud Functions
+gcloud compute firewall-rules create allow-ssh-vm-power-manager \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp:22 \
+  --source-ranges=0.0.0.0/0 \
+  --target-tags=vm-power-manager-ssh
+
+# Add tag to each managed VM
+gcloud compute instances add-tags VM_NAME \
+  --tags=vm-power-manager-ssh \
+  --zone=ZONE --project=PROJECT
+```
+
+**AWS Lambda → EC2:**
+- Add inbound rule to Security Group: TCP 22 from Lambda's VPC/NAT IP
+
+**Any → On-premise:**
+- Ensure port 22 is forwarded or VPN is configured
+
+---
+
 ## Quick Reference
 
 ```bash
