@@ -21,11 +21,19 @@ STATE_BUCKET="${STATE_BUCKET:-${PROJECT_ID}-vm-power-state}"
 SCHEDULER_INTERVAL="${SCHEDULER_INTERVAL:-10}"
 
 # --- Schedule Configuration (configurable) ---
-# Format: standard cron expressions
-# Default: Daily report at 9 AM IST (3:30 UTC), GPU report at 9 PM IST (15:30 UTC)
-DAILY_REPORT_CRON="${DAILY_REPORT_CRON:-30 3 * * *}"
+# Supports MULTIPLE cron expressions — one Cloud Scheduler job per expression.
+# Format: space-separated cron expressions, each wrapped in quotes.
+#
+# Examples:
+#   Single daily:       DAILY_REPORT_SCHEDULES=("30 3 * * *")
+#   Every 2 hours:      GPU_REPORT_SCHEDULES=("0 */2 * * *")
+#   Every 6 hours:      GPU_REPORT_SCHEDULES=("0 */6 * * *")
+#   Multiple times:     GPU_REPORT_SCHEDULES=("0 10 * * *" "30 14 * * *" "14 21 * * *")
+#   Weekdays 9AM+9PM:   GPU_REPORT_SCHEDULES=("0 9 * * 1-5" "0 21 * * 1-5")
+
+DAILY_REPORT_SCHEDULES=("${DAILY_REPORT_SCHEDULES[@]:-30 3 * * *}")
 DAILY_REPORT_TZ="${DAILY_REPORT_TZ:-UTC}"
-GPU_REPORT_CRON="${GPU_REPORT_CRON:-30 15 * * *}"
+GPU_REPORT_SCHEDULES=("${GPU_REPORT_SCHEDULES[@]:-30 15 * * *}")
 GPU_REPORT_TZ="${GPU_REPORT_TZ:-UTC}"
 
 # Optional: SSH key for metric collection (base64 encoded)
@@ -168,31 +176,43 @@ gcloud scheduler jobs create pubsub vm-power-monitor-job \
   --message-body='{"trigger": "scheduled"}' \
   --quiet
 
-# Daily report (configurable)
-echo "   Daily report: $DAILY_REPORT_CRON ($DAILY_REPORT_TZ)"
-gcloud scheduler jobs delete vm-power-daily-digest \
-  --project="$PROJECT_ID" --location="$REGION" --quiet 2>/dev/null || true
-gcloud scheduler jobs create pubsub vm-power-daily-digest \
-  --project="$PROJECT_ID" \
-  --location="$REGION" \
-  --topic="vm-power-daily-digest-trigger" \
-  --schedule="$DAILY_REPORT_CRON" \
-  --message-body='{"trigger": "daily_digest"}' \
-  --time-zone="$DAILY_REPORT_TZ" \
-  --quiet
+# Daily report — one job per schedule expression
+echo "   Daily report schedules:"
+for i in "${!DAILY_REPORT_SCHEDULES[@]}"; do
+  JOB_NAME="vm-power-daily-digest"
+  if [ "$i" -gt 0 ]; then JOB_NAME="vm-power-daily-digest-$((i+1))"; fi
+  CRON="${DAILY_REPORT_SCHEDULES[$i]}"
+  echo "     [$((i+1))] $CRON ($DAILY_REPORT_TZ)"
+  gcloud scheduler jobs delete "$JOB_NAME" \
+    --project="$PROJECT_ID" --location="$REGION" --quiet 2>/dev/null || true
+  gcloud scheduler jobs create pubsub "$JOB_NAME" \
+    --project="$PROJECT_ID" \
+    --location="$REGION" \
+    --topic="vm-power-daily-digest-trigger" \
+    --schedule="$CRON" \
+    --message-body='{"trigger": "daily_digest"}' \
+    --time-zone="$DAILY_REPORT_TZ" \
+    --quiet
+done
 
-# GPU status report (configurable)
-echo "   GPU report:   $GPU_REPORT_CRON ($GPU_REPORT_TZ)"
-gcloud scheduler jobs delete vm-power-gpu-status \
-  --project="$PROJECT_ID" --location="$REGION" --quiet 2>/dev/null || true
-gcloud scheduler jobs create pubsub vm-power-gpu-status \
-  --project="$PROJECT_ID" \
-  --location="$REGION" \
-  --topic="vm-power-gpu-status-trigger" \
-  --schedule="$GPU_REPORT_CRON" \
-  --message-body='{"trigger": "gpu_status"}' \
-  --time-zone="$GPU_REPORT_TZ" \
-  --quiet
+# GPU status report — one job per schedule expression
+echo "   GPU report schedules:"
+for i in "${!GPU_REPORT_SCHEDULES[@]}"; do
+  JOB_NAME="vm-power-gpu-status"
+  if [ "$i" -gt 0 ]; then JOB_NAME="vm-power-gpu-status-$((i+1))"; fi
+  CRON="${GPU_REPORT_SCHEDULES[$i]}"
+  echo "     [$((i+1))] $CRON ($GPU_REPORT_TZ)"
+  gcloud scheduler jobs delete "$JOB_NAME" \
+    --project="$PROJECT_ID" --location="$REGION" --quiet 2>/dev/null || true
+  gcloud scheduler jobs create pubsub "$JOB_NAME" \
+    --project="$PROJECT_ID" \
+    --location="$REGION" \
+    --topic="vm-power-gpu-status-trigger" \
+    --schedule="$CRON" \
+    --message-body='{"trigger": "gpu_status"}' \
+    --time-zone="$GPU_REPORT_TZ" \
+    --quiet
+done
 
 # Cleanup
 rm -rf "$BUILD_DIR"
@@ -208,7 +228,7 @@ echo "  2. Interactivity Request URL       → $SLACK_URL"
 echo "  3. Invite bot: /invite @VM Power Manager"
 echo ""
 echo "Schedule summary:"
-echo "  Monitor:      every $SCHEDULER_INTERVAL min"
-echo "  Daily report: $DAILY_REPORT_CRON ($DAILY_REPORT_TZ)"
-echo "  GPU report:   $GPU_REPORT_CRON ($GPU_REPORT_TZ)"
+echo "  Monitor:        every $SCHEDULER_INTERVAL min"
+echo "  Daily reports:  ${#DAILY_REPORT_SCHEDULES[@]} schedule(s) ($DAILY_REPORT_TZ)"
+echo "  GPU reports:    ${#GPU_REPORT_SCHEDULES[@]} schedule(s) ($GPU_REPORT_TZ)"
 echo ""

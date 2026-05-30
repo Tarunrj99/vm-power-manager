@@ -145,8 +145,10 @@ state:
   backend: "gcs_bucket"
 
 schedule:
-  daily_report_time: "03:30"
+  daily_report_schedules:
+    - "30 3 * * *"
   daily_report_timezone: "UTC"
-  gpu_report_time: "15:30"
+  gpu_report_schedules:
+    - "30 15 * * *"
   gpu_report_timezone: "UTC"
   gpu_report_enabled: true

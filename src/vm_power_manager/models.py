@@ -99,11 +99,19 @@ class NotificationConfig(BaseModel):
 
 
 class ScheduleConfig(BaseModel):
-    """Configurable schedules for automated reports."""
+    """Configurable schedules for automated reports.
 
-    daily_report_time: str = "03:30"
+    Each schedule is a list of cron expressions. Multiple entries = multiple triggers.
+    Examples:
+      - ["30 3 * * *"]              → once daily at 3:30 UTC
+      - ["0 */2 * * *"]            → every 2 hours
+      - ["0 */6 * * *"]            → every 6 hours
+      - ["0 10 * * *", "30 14 * * *", "14 21 * * *"]  → at 10:00, 14:30, 21:14
+    """
+
+    daily_report_schedules: list[str] = Field(default_factory=lambda: ["30 3 * * *"])
     daily_report_timezone: str = "UTC"
-    gpu_report_time: str = "15:30"
+    gpu_report_schedules: list[str] = Field(default_factory=lambda: ["30 15 * * *"])
     gpu_report_timezone: str = "UTC"
     gpu_report_enabled: bool = True
 

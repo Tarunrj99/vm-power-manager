@@ -155,3 +155,63 @@ If the primary source returns `None`, the system falls back to SSH automatically
 | `allowed_users` | list | No | For `specific_users` mode |
 
 Plus all `defaults.*` keys can be overridden per VM.
+
+### schedule
+
+Controls when automated reports are sent. Each report type accepts a **list** of cron expressions — one Cloud Scheduler job is created per expression.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `daily_report_schedules` | list[string] | `["30 3 * * *"]` | Cron expressions for daily full report |
+| `daily_report_timezone` | string | `UTC` | IANA timezone for daily report |
+| `gpu_report_schedules` | list[string] | `["30 15 * * *"]` | Cron expressions for GPU status report |
+| `gpu_report_timezone` | string | `UTC` | IANA timezone for GPU report |
+| `gpu_report_enabled` | bool | `true` | Set `false` to disable GPU reports entirely |
+
+#### Schedule Examples
+
+```yaml
+# Once daily at 9 AM IST (3:30 UTC)
+schedule:
+  daily_report_schedules:
+    - "30 3 * * *"
+  gpu_report_schedules:
+    - "30 15 * * *"
+
+# GPU report every 2 hours
+schedule:
+  gpu_report_schedules:
+    - "0 */2 * * *"
+
+# GPU report every 6 hours
+schedule:
+  gpu_report_schedules:
+    - "0 */6 * * *"
+
+# GPU report at specific times (10:00, 14:30, 21:14 UTC)
+schedule:
+  gpu_report_schedules:
+    - "0 10 * * *"
+    - "30 14 * * *"
+    - "14 21 * * *"
+
+# GPU report 3 times daily at 9 AM, 3 PM, 9 PM (IST timezone)
+schedule:
+  gpu_report_schedules:
+    - "0 9 * * *"
+    - "0 15 * * *"
+    - "0 21 * * *"
+  gpu_report_timezone: "Asia/Kolkata"
+
+# Weekdays only
+schedule:
+  daily_report_schedules:
+    - "0 9 * * 1-5"
+  gpu_report_schedules:
+    - "0 18 * * 1-5"
+
+# Every 30 minutes (aggressive monitoring)
+schedule:
+  gpu_report_schedules:
+    - "*/30 * * * *"
+```

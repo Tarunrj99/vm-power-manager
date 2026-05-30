@@ -29,15 +29,32 @@ state:
   prefix: "state/"
 
 # --- Report Schedules ---
-# Configure when automated reports are sent.
-# Times in deploy.sh cron format; these are config-layer documentation.
-# Actual scheduling is done via Cloud Scheduler (see deploy.sh).
+# Each report type accepts a LIST of cron expressions.
+# Multiple entries = multiple triggers per day. Uses standard cron syntax.
+#
+# Cron format: "minute hour day-of-month month day-of-week"
+#
+# Examples:
+#   Single time:       ["30 3 * * *"]                     → 3:30 AM UTC daily
+#   Every 2 hours:     ["0 */2 * * *"]                    → 00:00, 02:00, 04:00, ...
+#   Every 6 hours:     ["0 */6 * * *"]                    → 00:00, 06:00, 12:00, 18:00
+#   Every 30 minutes:  ["*/30 * * * *"]                   → :00 and :30 of every hour
+#   Specific times:    ["0 10 * * *", "30 14 * * *", "14 21 * * *"]  → 10:00, 14:30, 21:14
+#   Weekdays only:     ["0 9 * * 1-5"]                    → 9 AM Mon-Fri
+#   Twice daily:       ["0 9 * * *", "0 21 * * *"]        → 9 AM and 9 PM
+#
 schedule:
-  daily_report_time: "03:30"         # UTC time (e.g., 03:30 UTC = 9:00 AM IST)
-  daily_report_timezone: "UTC"       # IANA timezone
-  gpu_report_time: "15:30"           # UTC time (e.g., 15:30 UTC = 9:00 PM IST)
-  gpu_report_timezone: "UTC"         # IANA timezone
-  gpu_report_enabled: true           # Set false to disable GPU status reports
+  # Full daily report (all VMs — running + stopped)
+  daily_report_schedules:
+    - "30 3 * * *"                  # 3:30 AM UTC = 9:00 AM IST
+  daily_report_timezone: "UTC"      # IANA timezone (UTC, America/New_York, Asia/Kolkata, etc.)
+
+  # GPU VMs status report (only running GPU VMs)
+  # Configure multiple times for more frequent monitoring of expensive GPU VMs
+  gpu_report_schedules:
+    - "30 15 * * *"                 # 3:30 PM UTC = 9:00 PM IST
+  gpu_report_timezone: "UTC"
+  gpu_report_enabled: true          # Set false to completely disable GPU reports
 
 # Override defaults per-deployment (optional)
 # defaults:
