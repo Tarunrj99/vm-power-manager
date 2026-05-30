@@ -386,6 +386,7 @@ vms:
 
 | Doc | Topic |
 |-----|-------|
+| [SLACK_OUTPUTS.md](docs/SLACK_OUTPUTS.md) | Example Slack messages for every notification type |
 | [CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md) | Every config key, with examples |
 | [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) | End-to-end: GCP + Slack setup |
 | [METRICS_SETUP.md](docs/METRICS_SETUP.md) | Metric collection: Ops Agent vs SSH, setup for GCP/AWS/any VM |
