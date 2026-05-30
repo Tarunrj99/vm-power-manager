@@ -628,11 +628,11 @@ def _build_status_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
     ip = vm.get("ip") or "—"
 
     if vm.get("running") and running_since != "—":
-        status_line = f"*Status:*           {status_text}\n*Running Since:* {running_since}  _({uptime})_"
+        status_line = f"*Status:* {status_text}\n*Running Since:* {running_since} _({uptime})_"
     elif vm.get("running"):
-        status_line = f"*Status:*           {status_text}\n*Uptime:*          {uptime}"
+        status_line = f"*Status:* {status_text}\n*Uptime:* {uptime}"
     else:
-        status_line = f"*Status:*           {status_text}"
+        status_line = f"*Status:* {status_text}"
 
     lines = [f"{status_emoji}  *{vm['name']}*\n\n{status_line}\n"]
 
@@ -640,22 +640,22 @@ def _build_status_vm_block(vm: dict, is_gpu: bool = True) -> list[dict]:
         gpu_type = vm.get("gpu_type", "—")
         gpu = _fmt_pct(vm.get("gpu"))
         gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
-        lines.append(f"*GPU Model:*      `{gpu_type}`")
-        lines.append(f"*GPU Util:*         `{gpu}`")
-        lines.append(f"*GPU Memory:*   `{gpu_mem}`")
+        lines.append(f"*GPU Model:* `{gpu_type}`")
+        lines.append(f"*GPU Util:* `{gpu}`")
+        lines.append(f"*GPU Memory:* `{gpu_mem}`")
         lines.append("")
 
     cpu = _fmt_pct(vm.get("cpu"))
     cores = vm.get("cpu_cores")
-    cpu_str = f"{cpu}  ({cores} cores)" if cores else cpu
+    cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
     mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
     disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
 
-    lines.append(f"*CPU:*               `{cpu_str}`")
-    lines.append(f"*RAM:*              `{mem}`")
-    lines.append(f"*Disk:*              `{disk}`")
-    lines.append(f"*Processes:*      `{procs} active`")
-    lines.append(f"*IP:*                 `{ip}`")
+    lines.append(f"*CPU:* `{cpu_str}`")
+    lines.append(f"*RAM:* `{mem}`")
+    lines.append(f"*Disk:* `{disk}`")
+    lines.append(f"*Processes:* `{procs} active`")
+    lines.append(f"*IP:* `{ip}`")
 
     return [{"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}}]
 
@@ -676,43 +676,43 @@ def _build_detailed_vm_block(vm: dict, is_gpu: bool = True, display: ReportDispl
     mentions = vm.get("notify_users", "")
 
     if d.show_uptime and vm.get("running") and running_since != "—":
-        status_line = f"*Status:*        {status_text}\n*Running Since:*  {running_since}  _({uptime})_"
+        status_line = f"*Status:* {status_text}\n*Running Since:* {running_since} _({uptime})_"
     elif d.show_uptime and vm.get("running"):
-        status_line = f"*Status:*        {status_text}\n*Uptime:*         {uptime}"
+        status_line = f"*Status:* {status_text}\n*Uptime:* {uptime}"
     else:
-        status_line = f"*Status:*        {status_text}"
+        status_line = f"*Status:* {status_text}"
 
     lines = [f"{status_emoji}  *{vm['name']}*\n\n{status_line}\n"]
 
     if is_gpu:
         if d.show_gpu_model:
             gpu_type = vm.get("gpu_type", "—")
-            lines.append(f"*GPU Model:*     `{gpu_type}`")
+            lines.append(f"*GPU Model:* `{gpu_type}`")
         if d.show_gpu_utilization:
             gpu = _fmt_pct(vm.get("gpu"))
-            lines.append(f"*GPU Util:*        `{gpu}`")
+            lines.append(f"*GPU Util:* `{gpu}`")
         if d.show_gpu_memory:
             gpu_mem = _fmt_mem_mb(vm.get("gpu_memory_used_mb"), vm.get("gpu_memory_total_mb"))
-            lines.append(f"*GPU Memory:*  `{gpu_mem}`")
+            lines.append(f"*GPU Memory:* `{gpu_mem}`")
         if d.show_gpu_model or d.show_gpu_utilization or d.show_gpu_memory:
             lines.append("")
 
     if d.show_cpu:
         cpu = _fmt_pct(vm.get("cpu"))
         cores = vm.get("cpu_cores")
-        cpu_str = f"{cpu}  ({cores} cores)" if cores else cpu
-        lines.append(f"*CPU:*              `{cpu_str}`")
+        cpu_str = f"{cpu} ({cores} cores)" if cores else cpu
+        lines.append(f"*CPU:* `{cpu_str}`")
     if d.show_ram:
         mem = _fmt_mem(vm.get("memory"), vm.get("memory_used_mb"), vm.get("memory_total_mb"))
-        lines.append(f"*RAM:*             `{mem}`")
+        lines.append(f"*RAM:* `{mem}`")
     if d.show_disk:
         disk = _fmt_disk(vm.get("disk"), vm.get("disk_used_gb"), vm.get("disk_total_gb"))
-        lines.append(f"*Disk:*             `{disk}`")
+        lines.append(f"*Disk:* `{disk}`")
     if d.show_processes:
-        lines.append(f"*Processes:*     `{procs} active`")
+        lines.append(f"*Processes:* `{procs} active`")
     if d.show_ip:
         ip = vm.get("ip") or "—"
-        lines.append(f"*IP:*                 `{ip}`")
+        lines.append(f"*IP:* `{ip}`")
 
     blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": "\n".join(lines)}},

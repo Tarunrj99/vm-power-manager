@@ -54,7 +54,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Replaced `featuresurface-ai-vm-01` with `featuresurface-ai-vm-02` (nvidia-a100-80gb, a2-ultragpu-1g)
+- Updated VM configurations and metric collection improvements
 - Status/daily templates redesigned: show VRAM, core count, total/used for memory and disk
 - `_collect_metrics()` gathers exact values for all metric types when SSH is available
 - GPU running alert and daily digest templates updated with exact values
