@@ -321,11 +321,21 @@ def send_daily_digest(config: str | Path | Config) -> dict:
             metrics = state.last_metrics if state else {}
 
             uptime = "—"
+            running_since = "—"
             if state and state.session_started and is_running:
                 delta = now - state.session_started
-                hours = int(delta.total_seconds() / 3600)
+                days = int(delta.total_seconds() / 86400)
+                hours = int((delta.total_seconds() % 86400) / 3600)
                 minutes = int((delta.total_seconds() % 3600) / 60)
-                uptime = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+                if days > 0:
+                    uptime = f"{days}d {hours}h"
+                elif hours > 0:
+                    uptime = f"{hours}h {minutes}m"
+                else:
+                    uptime = f"{minutes}m"
+                running_since = state.session_started.strftime("%b %d, %I:%M %p")
+
+            mentions = " ".join(resolved.notify_users) if resolved.notify_users else ""
 
             return {
                 "name": resolved.name,
@@ -344,6 +354,8 @@ def send_daily_digest(config: str | Path | Config) -> dict:
                 "processes": metrics.get("active_process_count", 0),
                 "gpu_type": resolved.gpu_type,
                 "uptime": uptime,
+                "running_since": running_since,
+                "notify_users": mentions,
             }
         except Exception as e:
             return {"name": resolved.name, "running": False, "error": str(e)[:100], "gpu_type": vm_cfg.gpu_type}
@@ -369,6 +381,106 @@ def send_daily_digest(config: str | Path | Config) -> dict:
         logger.error(f"Failed to send daily digest: {e}")
 
     return {"status": "sent", "vms_reported": len(summaries)}
+
+
+def send_gpu_status_report(config: str | Path | Config) -> dict:
+    """Send a consolidated GPU VMs status report — only running GPU VMs.
+
+    Designed to be called 12 hours after the daily digest (e.g., 9 PM if daily is 9 AM).
+    """
+    if isinstance(config, (str, Path)):
+        config = load_config(config)
+
+    manifest_result = _check_manifest_gate(config)
+    if manifest_result is not None:
+        return manifest_result
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from slack_sdk import WebClient
+
+    state_backend = create_state_backend(config)
+    defaults = config.defaults
+    now = datetime.now(timezone.utc)
+
+    def _collect_gpu_vm(vm_cfg):
+        resolved = vm_cfg.get_effective_config(defaults)
+        if not resolved.gpu_type:
+            return None
+        try:
+            from vm_power_manager.monitor import _get_vm_adapter
+            adapter = _get_vm_adapter(resolved)
+            info = adapter.get_status()
+            if info.status != "RUNNING":
+                return None
+
+            state = state_backend.get(resolved.name)
+            metrics = state.last_metrics if state else {}
+
+            uptime = "—"
+            running_since = "—"
+            if state and state.session_started:
+                delta = now - state.session_started
+                days = int(delta.total_seconds() / 86400)
+                hours = int((delta.total_seconds() % 86400) / 3600)
+                minutes = int((delta.total_seconds() % 3600) / 60)
+                if days > 0:
+                    uptime = f"{days}d {hours}h"
+                elif hours > 0:
+                    uptime = f"{hours}h {minutes}m"
+                else:
+                    uptime = f"{minutes}m"
+                running_since = state.session_started.strftime("%b %d, %I:%M %p")
+
+            mentions = " ".join(resolved.notify_users) if resolved.notify_users else ""
+
+            return {
+                "name": resolved.name,
+                "running": True,
+                "gpu": metrics.get("gpu_utilization"),
+                "gpu_memory_used_mb": metrics.get("gpu_memory_used_mb"),
+                "gpu_memory_total_mb": metrics.get("gpu_memory_total_mb"),
+                "cpu": metrics.get("cpu_utilization"),
+                "cpu_cores": metrics.get("cpu_cores"),
+                "memory": metrics.get("memory_utilization"),
+                "memory_used_mb": metrics.get("memory_used_mb"),
+                "memory_total_mb": metrics.get("memory_total_mb"),
+                "disk": metrics.get("disk_utilization"),
+                "disk_used_gb": metrics.get("disk_used_gb"),
+                "disk_total_gb": metrics.get("disk_total_gb"),
+                "processes": metrics.get("active_process_count", 0),
+                "gpu_type": resolved.gpu_type,
+                "uptime": uptime,
+                "running_since": running_since,
+                "notify_users": mentions,
+            }
+        except Exception:
+            return None
+
+    gpu_summaries = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_collect_gpu_vm, vm): vm for vm in config.vms}
+        for future in as_completed(futures, timeout=30):
+            try:
+                result = future.result()
+                if result:
+                    gpu_summaries.append(result)
+            except Exception:
+                pass
+
+    if not gpu_summaries:
+        return {"status": "skipped", "reason": "no_running_gpu_vms"}
+
+    msg = MessageBuilder.gpu_status_report(gpu_summaries)
+
+    try:
+        token = get_slack_token(config)
+        client = WebClient(token=token)
+        channel = config.slack.default_channel
+        _post_message(client, channel, msg)
+    except Exception as e:
+        logger.error(f"Failed to send GPU status report: {e}")
+
+    return {"status": "sent", "gpu_vms_reported": len(gpu_summaries)}
 
 
 def _send_notifications(actions: list[dict], config: Config, state_backend: StateBackend):

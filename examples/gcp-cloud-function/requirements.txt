@@ -5,7 +5,7 @@
 # For production, pin to a tag (e.g. @v1.1.0) or a commit SHA so deploys are
 # reproducible. `@main` is convenient for quick iteration only.
 # ---------------------------------------------------------------------------
-vm-power-manager @ git+https://github.com/Tarunrj99/vm-power-manager.git@v1.3.1
+vm-power-manager @ git+https://github.com/Tarunrj99/vm-power-manager.git@v1.4.0
 
 # Cloud Functions 2nd gen runtime requires this:
 functions-framework>=3.5.0

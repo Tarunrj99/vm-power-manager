@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] — 2026-05-31
+
+### Added
+
+- **Consolidated GPU Status Report**: New `send_gpu_status_report()` — sends one consolidated message for all running GPU VMs instead of individual per-VM alerts
+- **Redesigned Daily Digest**: Beautiful multi-line format with each metric on its own labeled line, "Running Since" with date + duration, cost-awareness note
+- **12-hour schedule**: Daily full report at 9 AM, GPU-only status at 9 PM (configurable)
+- **Cost reminder messages**: Both reports include a friendly note about stopping idle VMs
+- **Smart duration format**: Shows `25d 20h` for long-running VMs, `2h 15m` for shorter, `10m` for recent
+- `gpu_status` Cloud Function entry point for the 9 PM report
+
+### Changed
+
+- GPU alerts are now consolidated (1 message for all VMs) instead of individual per-VM messages
+- Disabled per-VM GPU running alerts (replaced by consolidated report)
+- Templates completely redesigned: spacious, each metric on its own line, clear section labels
+- Alert interval changed from 1 hour to 12 hours
+
+### Removed
+
+- Hourly per-VM GPU running alerts (replaced by 12h consolidated report)
+
 ## [1.3.0] — 2026-05-30
 
 ### Added
